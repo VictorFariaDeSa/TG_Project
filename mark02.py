@@ -26,9 +26,8 @@ if __name__ == "__main__":
         "FL_lower_leg_joint"]
     
     n_games:int = 500
-    scores: list[float] = np.zeros((1,n_games))
-    eps_history: list[float] = np.zeros((1,n_games))
-
+    scores: list[float] = np.zeros(n_games)
+    eps_history: list[float] = np.zeros(n_games)
 
     for i in range(n_games):
         score:int = 0
