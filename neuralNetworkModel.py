@@ -80,7 +80,6 @@ class Agent():
 
         self.mem_counter+=1
 
-
     def choose_action(self, nn_prediction, e=None):
         if e is None:
             e = self.epsilon
@@ -106,8 +105,6 @@ class Agent():
             final_actions.append(row_actions)
         
         return torch.tensor(final_actions).squeeze()
-
-
     
     def learn(self):
         if self.mem_counter < self.batch_size:
@@ -150,7 +147,17 @@ class Agent():
 
         self.epsilon = self.epsilon - self.eps_dec if self.epsilon > self.eps_min else self.eps_min
     
-
+    def LoadModel(self,path):
+        if os.path.exists(path):
+            print("Arquivo encontrado. Carregando o modelo...")
+            self.Q_eval.load_state_dict(torch.load(path))
+            self.Q_eval.train()
+        else:
+            print("Arquivo não encontrado. Treinando e salvando o modelo...")
+    
+    def saveModel(self,model_path):
+        torch.save(self.Q_eval.state_dict(), model_path)
+        print("Modelo salvo com sucesso!")
 
 class RobotNeuralNetwork(nn.Module):
     def __init__(self):

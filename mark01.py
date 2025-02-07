@@ -1,7 +1,7 @@
 from coppeliasim_zmqremoteapi_client import *
 import time
 import math
-from SimulationControl import startSimulation, getEnviromentVector, translateAction, getReward, checkFall, checkDirection
+from SimulationControl import startSimulation, getEnviromentVector, translateAction, getReward, checkFall
 from neuralNetworkModel import Policy,loadModel,saveModel
 import numpy as np
 import torch
