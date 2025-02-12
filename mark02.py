@@ -38,7 +38,7 @@ if __name__ == "__main__":
         "FL_lower_leg_joint"]
     
     signal.signal(signal.SIGINT, handle_interrupt)
-    n_games:int = 500
+    n_games:int = 3000
     scores: list[float] = []
     eps_history: list[float] = np.zeros(n_games)
     agent.LoadModel(path = model_path)

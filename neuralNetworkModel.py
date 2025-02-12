@@ -41,7 +41,7 @@ class Agent():
                  n_actions:int, 
                  max_mem_size:int = 100000, 
                  eps_end:float=0.01, 
-                 eps_dec:float=2e-6,
+                 eps_dec:float=2e-7,
                  num_actions_p_joint:int = 3):
         
         self.gamma = gamma
