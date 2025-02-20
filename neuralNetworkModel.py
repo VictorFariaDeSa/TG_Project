@@ -19,7 +19,9 @@ class DeepQNetwork(nn.Module):
         self.optimizer = optim.Adam(self.parameters(),lr=lr)
         self.loss = nn.MSELoss()
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.device = torch.device("cpu")
+        self.device = "cpu"
+        self.to(self.device)
+
     
     def forward(self,observation):
         shape = observation.size()
@@ -60,8 +62,8 @@ class Agent():
         self.Q_eval:DeepQNetwork = DeepQNetwork(lr = self.lr,
                                                 n_actions=n_actions,
                                                 input_dims=input_dims,
-                                                fc1_dims=256,
-                                                fc2_dims=256)
+                                                fc1_dims=100,
+                                                fc2_dims=100)
 
         self.state_memory = np.zeros((self.mem_size,input_dims),dtype=np.float32)
         self.new_state_memory = np.zeros((self.mem_size,input_dims),dtype=np.float32)
@@ -72,13 +74,17 @@ class Agent():
 
     def store_transitions(self,state,action,reward,state_,done):
         index = self.mem_counter%self.mem_size
-        self.state_memory[index] = state
-        self.action_memory[index] = action
+        self.state_memory[index] = state.cpu().numpy()
+        self.action_memory[index] = action.cpu().numpy()
         self.reward_memory[index] = reward
-        self.new_state_memory[index] = state_    
+        self.new_state_memory[index] = state_.cpu().numpy()    
         self.terminal_memory[index] = done
 
         self.mem_counter+=1
+
+    def policy(self,observation):
+        nn_prediction = self.Q_eval(observation)
+        return self.choose_action(nn_prediction)
 
     def choose_action(self, nn_prediction, e=None):
         if e is None:
@@ -115,12 +121,12 @@ class Agent():
 
         batch = np.random.choice(max_mem, self.batch_size, replace=False)
 
-        state_batch = torch.tensor(self.state_memory[batch]).to(self.Q_eval.device)
-        new_state_batch = torch.tensor(self.new_state_memory[batch]).to(self.Q_eval.device)
-        reward_batch = torch.tensor(self.reward_memory[batch]).to(self.Q_eval.device)
-        terminal_batch = torch.tensor(self.terminal_memory[batch]).to(self.Q_eval.device)
+        state_batch = torch.tensor(self.state_memory[batch], device=self.Q_eval.device)
+        new_state_batch = torch.tensor(self.new_state_memory[batch], device=self.Q_eval.device)
+        reward_batch = torch.tensor(self.reward_memory[batch], device=self.Q_eval.device)
+        terminal_batch = torch.tensor(self.terminal_memory[batch], device=self.Q_eval.device)
+        action_batch = torch.tensor(self.action_memory[batch], dtype=torch.long, device=self.Q_eval.device)
 
-        action_batch = torch.tensor(self.action_memory[batch], dtype=torch.long).to(self.Q_eval.device)
         
         q_eval = self.Q_eval.forward(state_batch)
         q_real = torch.clone(q_eval)
@@ -131,10 +137,11 @@ class Agent():
 
         linha_zeros = torch.zeros((1, self.n_actions))
         q_next = q_next.float()
-        q_next[terminal_batch.flatten()] = linha_zeros
+        q_next[terminal_batch.flatten()] = linha_zeros.to(self.Q_eval.device)
         
         q_next_actions = self.choose_action(q_next,e=0)
-        q_next_mean_reward = torch.mean(torch.gather(q_next,1,q_next_actions),dim=1)
+        q_next_mean_reward = torch.mean(torch.gather(q_next, 1, q_next_actions.to(q_next.device)), dim=1)
+
 
         q_target = (reward_batch +self.gamma * q_next_mean_reward).unsqueeze(1)
         rows = torch.arange(self.batch_size).unsqueeze(1)
