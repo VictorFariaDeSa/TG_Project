@@ -42,6 +42,7 @@ def save_scores(scores, filename):
 simulation_name = "Deep_Q_learning_mark01_100neurons"
 model_path = f"models/{simulation_name}.pth"
 memory_score_path = f"scores/{simulation_name}.npy"
+n_robots = 10
 
 if __name__ == "__main__":
     agent:Agent = Agent(
@@ -59,22 +60,24 @@ if __name__ == "__main__":
     eps_history: list[float] = np.zeros(n_games)
     agent.LoadModel(path = model_path)
 
-    env = createSimulation(agent.Q_eval.device)
+    env = createSimulation(n_robots,agent.Q_eval.device)
     observation:torch.Tensor = env.reset()
     
-    
+    print([robot.path for robot in env.robot_list])
+
     for i in range(n_games):
         start_time = time.time()
         score:int = 0
         done:bool = False
         while True:
             action = agent.policy(observation)
-            observation_, reward, terminated = env.step(action)
-            agent.store_transitions(observation,action,reward,observation_,done)
+            observation_, reward, terminated = env.step(action) #TODO este action deve ter 2 dimensões, sendo a segundo igual ao núemro de robos do enviroment
+            agent.store_transitions(observation,action,reward,observation_,terminated)
             agent.learn()
             score += reward
             observation = observation_
-            if terminated:
+            done = env.checkDone()
+            if done:
                 observation =  env.reset()
                 elapsed_time = time.time()-start_time
                 break
@@ -83,7 +86,7 @@ if __name__ == "__main__":
 
         avg_score:float = np.mean(scores[-100:])
     
-        print(f"Episode {i} - Score: {score} - Avg_Score: {avg_score} - Epsilon: {agent.epsilon} - Tempo: {elapsed_time:.3f} s")
+        print(f"Episode {i} - Score: {np.mean(score)} - Avg_Score: {avg_score} - Epsilon: {agent.epsilon} - Tempo: {elapsed_time:.3f} s")
     agent.saveModel(model_path)
     plotScores(scores)
     save_scores(scores,memory_score_path)

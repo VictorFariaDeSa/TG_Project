@@ -72,15 +72,17 @@ class Agent():
         self.reward_memory = np.zeros(self.mem_size,dtype=np.float32)
         self.terminal_memory = np.zeros(self.mem_size,dtype=bool)
 
-    def store_transitions(self,state,action,reward,state_,done):
-        index = self.mem_counter%self.mem_size
-        self.state_memory[index] = state.cpu().numpy()
-        self.action_memory[index] = action.cpu().numpy()
-        self.reward_memory[index] = reward
-        self.new_state_memory[index] = state_.cpu().numpy()    
-        self.terminal_memory[index] = done
+    def store_transitions(self, state, action, reward, state_, done):
+        batch_size = state.shape[0]
+        indices = np.arange(self.mem_counter, self.mem_counter + batch_size) % self.mem_size 
 
-        self.mem_counter+=1
+        self.state_memory[indices] = state.cpu().numpy()
+        self.action_memory[indices] = action.cpu().numpy()
+        self.reward_memory[indices] = reward.cpu().numpy().squeeze()
+        self.new_state_memory[indices] = state_.cpu().numpy()
+        self.terminal_memory[indices] = done.cpu().numpy().squeeze()
+
+        self.mem_counter += batch_size 
 
     def policy(self,observation):
         nn_prediction = self.Q_eval(observation)
