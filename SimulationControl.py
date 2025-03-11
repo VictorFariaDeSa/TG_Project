@@ -37,15 +37,21 @@ class env():
           self.jointHandler = jointHandler
           self.jointList = jointList
           self.device = device
+          self.score = 0
 
     def step(self,actions):
+        actions =  torch.tensor(actions,dtype=int)
+        actions_reshaped = actions.view(-1, 3)
         for joint_index, jointName in enumerate(self.jointList):
                 joint = self.jointHandler[jointName]
-                self.translateAction(action = actions[joint_index]-3*joint_index, joint = joint)
+                actions_subset = actions_reshaped[joint_index]
+                self.translateAction(action = torch.argmax(actions_subset).item(), joint = joint)
         self.sim.step()
-        return self.getObservation(),self.getReward(), self.checkDone()
+        self.score+= self.getReward()
+        return self.getReward(), self.checkDone(), self.score
 
     def reset(self):
+        self.score = 0
         self.sim.stopSimulation()
         while self.sim.getSimulationState() != self.sim.simulation_stopped:
             time.sleep(0.1)
@@ -65,7 +71,7 @@ class env():
         return self.sim.getSimulationTime() >= time
         
     def checkDone(self):
-        return (self.checkFall() or self.checkArrival() or self.checkSimTime(50))
+        return (self.checkFall() or self.checkArrival() or self.checkSimTime(25))
 
     def translateAction(self, action:int,joint):
         match action:
@@ -93,15 +99,20 @@ class env():
         upsideDown = obj_matrix[10]
         env_vector.extend([correct_direction,upsideDown])
         
-        return torch.tensor(env_vector).to(self.device)
+        return np.array(env_vector)
     
     def getReward(self):
         dx, dy, dz = self.sim.getObjectPosition(self.robot, self.target)
         upsideBonus = 0 if self.checkUpsideDown() else -10
         reach_bonus = 100 if dx < 5 else 0
-        return -dx
+        belly_bonus = self.checkBellyTouchingGround()
+        return -dx-(5*belly_bonus) 
         return 30-dx+upsideBonus-dy+reach_bonus
     
+    def checkBellyTouchingGround(self):
+        dx, dy, dz = self.sim.getObjectPosition(self.robot, self.target)
+        return dz < 0.15
+
     def checkUpsideDown(self):
         obj_matrix = self.sim.getObjectMatrix(self.robot, -1)
         if obj_matrix[10] > 0:

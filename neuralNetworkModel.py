@@ -7,15 +7,17 @@ import os
 import torch.optim as optim
 
 class DeepQNetwork(nn.Module):
-    def __init__(self,lr:float,input_dims:int,fc1_dims:int,fc2_dims:int,n_actions:int):
+    def __init__(self,lr:float,input_dims:int,fc1_dims:int,fc2_dims:int,fc3_dims:int,n_actions:int):
         super(DeepQNetwork,self).__init__()
         self.input_dims = input_dims
         self.fc1_dims = fc1_dims
         self.fc2_dims = fc2_dims
+        self.fc3_dims = fc3_dims
         self.n_actions = n_actions
         self.fc1 = nn.Linear(in_features=input_dims,out_features=self.fc1_dims)
         self.fc2 = nn.Linear(in_features=self.fc1_dims,out_features=self.fc2_dims)
-        self.fc3 = nn.Linear(in_features=self.fc2_dims,out_features=self.n_actions)
+        self.fc3 = nn.Linear(in_features=self.fc2_dims,out_features=self.fc3_dims)
+        self.fc4 = nn.Linear(in_features=self.fc3_dims,out_features=self.n_actions)
         self.optimizer = optim.Adam(self.parameters(),lr=lr)
         self.loss = nn.MSELoss()
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -31,7 +33,8 @@ class DeepQNetwork(nn.Module):
         f"Deve-se passar um tensor com {self.input_dims} colunas.")
         x=F.relu(self.fc1(observation))
         x=F.relu(self.fc2(x))
-        actions = self.fc3(x)
+        x=F.relu(self.fc3(x))
+        actions = self.fc4(x)
         return actions
     
 class Agent():
@@ -62,8 +65,9 @@ class Agent():
         self.Q_eval:DeepQNetwork = DeepQNetwork(lr = self.lr,
                                                 n_actions=n_actions,
                                                 input_dims=input_dims,
-                                                fc1_dims=100,
-                                                fc2_dims=100)
+                                                fc1_dims=512,
+                                                fc2_dims=256,
+                                                fc3_dims=256,)
 
         self.state_memory = np.zeros((self.mem_size,input_dims),dtype=np.float32)
         self.new_state_memory = np.zeros((self.mem_size,input_dims),dtype=np.float32)
@@ -169,14 +173,14 @@ class Agent():
 class RobotNeuralNetwork(nn.Module):
     def __init__(self):
         super().__init__()
-        self.first_hidden_layer = nn.Linear(in_features=21, out_features=255)
-        self.second_hidden_layer = nn.Linear(in_features=255, out_features=255)
-        self.third_hidden_layer = nn.Linear(in_features=255, out_features=24)
+        self.first_hidden_layer = nn.Linear(in_features=21, out_features=100)
+        # self.second_hidden_layer = nn.Linear(in_features=255, out_features=255)
+        self.third_hidden_layer = nn.Linear(in_features=100, out_features=24)
 
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = F.relu(self.first_hidden_layer(x))
-        x = F.relu(self.second_hidden_layer(x))
+        # x = F.relu(self.second_hidden_layer(x))
         x = self.third_hidden_layer(x)
         return x
     

@@ -39,7 +39,7 @@ def save_scores(scores, filename):
     np.save(filename, existing_scores) 
 
 
-simulation_name = "Deep_Q_learning_mark01_100neurons"
+simulation_name = "Deep_Q_learning_mark02_100.100.neurons_225h"
 model_path = f"models/{simulation_name}.pth"
 memory_score_path = f"scores/{simulation_name}.npy"
 
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     agent:Agent = Agent(
         gamma=0.99,
         epsilon=0.1,
-        batch_size=500,
+        batch_size=250,
         n_actions=24,
         eps_end=0.1,
         input_dims=21,
