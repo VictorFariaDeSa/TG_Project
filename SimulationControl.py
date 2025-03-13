@@ -40,12 +40,9 @@ class env():
           self.score = 0
 
     def step(self,actions):
-        actions =  torch.tensor(actions,dtype=int)
-        actions_reshaped = actions.view(-1, 3)
         for joint_index, jointName in enumerate(self.jointList):
                 joint = self.jointHandler[jointName]
-                actions_subset = actions_reshaped[joint_index]
-                self.translateAction(action = torch.argmax(actions_subset).item(), joint = joint)
+                self.translateAction(action = actions[joint_index], joint = joint)
         self.sim.step()
         self.score+= self.getReward()
         return self.getReward(), self.checkDone(), self.score

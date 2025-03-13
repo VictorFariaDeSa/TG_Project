@@ -4,7 +4,7 @@ import numpy as np
 
 plt.ion()
 
-def plot(scores,mean_scores,evaluation_scores):
+def plot(scores,mean_scores):
     display.clear_output(wait=True)
     display.display(plt.gcf())
     plt.clf()
@@ -14,11 +14,11 @@ def plot(scores,mean_scores,evaluation_scores):
     plt.plot(scores)
     plt.plot(mean_scores)
     # plt.ylim(ymin=0)
-    evaluation_x = np.arange(10, len(evaluation_scores)*10+1, 10)
-    plt.plot(evaluation_x,evaluation_scores)
+    # evaluation_x = np.arange(10, len(evaluation_scores)*10+1, 10)
+    # plt.plot(evaluation_x,evaluation_scores)
     plt.text(len(scores)-1,scores[-1],str(scores[-1]))
     plt.text(len(mean_scores)-1,mean_scores[-1],str(mean_scores[-1]))
-    if len(evaluation_scores) > 1:
-        plt.text(len(evaluation_scores)-1,evaluation_scores[-1],str(evaluation_scores[-1]))
+    # if len(evaluation_scores) > 1:
+        # plt.text(len(evaluation_scores)-1,evaluation_scores[-1],str(evaluation_scores[-1]))
     plt.show(block=False)
     plt.pause(.1)
