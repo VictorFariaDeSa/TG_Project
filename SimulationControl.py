@@ -73,11 +73,11 @@ class env():
     def translateAction(self, action:int,joint):
         match action:
             case 0:
-                self.sim.setJointTargetVelocity(joint, -math.pi/5)
+                self.sim.setJointTargetVelocity(joint, -math.pi/3)
             case 1:
                 self.sim.setJointTargetVelocity(joint, 0)
             case 2:
-                self.sim.setJointTargetVelocity(joint, math.pi/5)
+                self.sim.setJointTargetVelocity(joint, math.pi/3)
             case _:
                 raise ValueError(f"Numero passado {action} para translate action não corresponde as ações")
              
@@ -103,6 +103,7 @@ class env():
         upsideBonus = 0 if self.checkUpsideDown() else -10
         reach_bonus = 100 if dx < 5 else 0
         belly_bonus = self.checkBellyTouchingGround()
+        return dz
         return -dx-(5*belly_bonus) 
         return 30-dx+upsideBonus-dy+reach_bonus
     
