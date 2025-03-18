@@ -30,14 +30,14 @@ def getHandles(sim,jointNames: list[str]):
             
 class env():
     def __init__(self,client, sim, robot, target, jointHandler,jointList,device):
-          self.client = client
-          self.sim = sim
-          self.robot = robot
-          self.target = target
-          self.jointHandler = jointHandler
-          self.jointList = jointList
-          self.device = device
-          self.score = 0
+        self.client = client
+        self.sim = sim
+        self.robot = robot
+        self.target = target
+        self.jointHandler = jointHandler
+        self.jointList = jointList
+        self.device = device
+        self.score = 0
 
     def step(self,actions):
         for joint_index, jointName in enumerate(self.jointList):
@@ -100,12 +100,19 @@ class env():
     
     def getReward(self):
         dx, dy, dz = self.sim.getObjectPosition(self.robot, self.target)
-        upsideBonus = 0 if self.checkUpsideDown() else -10
-        reach_bonus = 100 if dx < 5 else 0
-        belly_bonus = self.checkBellyTouchingGround()
-        return dz
-        return -dx-(5*belly_bonus) 
-        return 30-dx+upsideBonus-dy+reach_bonus
+        upside_penalty = -10 if self.checkUpsideDown() else 0
+        reach_bonus = 100 if dx < 1 else 0  # Big bonus for reaching target
+        progress_reward = -dx  # Reward for moving toward target
+        belly_penalty = -5 if self.checkBellyTouchingGround() else 0
+        height_penalty = -5 if dz < 0.15 else 0  # Penalize being too low
+        
+        # Combined reward to encourage:
+        # 1. Moving toward target (progress_reward)
+        # 2. Staying upright (upside_penalty)
+        # 3. Not dragging belly (belly_penalty)
+        # 4. Maintaining height (height_penalty)
+        # 5. Reaching target (reach_bonus)
+        return progress_reward + upside_penalty + belly_penalty + height_penalty + reach_bonus
     
     def checkBellyTouchingGround(self):
         dx, dy, dz = self.sim.getObjectPosition(self.robot, self.target)
