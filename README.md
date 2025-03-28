@@ -76,6 +76,7 @@ The next set of planned experiments includes:
 6. **Create a critic network for each joint** to enhance control precision.
 7. **Design a specific loss function for each actor-critic neural network pair** to optimize training.
 8. **Reduce the number of layers** to evaluate performance with a simpler network structure.
+9. **Try StableBaselines** for a already tested algorithm
 
 ## Contributions
 
