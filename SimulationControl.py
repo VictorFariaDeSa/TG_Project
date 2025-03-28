@@ -85,7 +85,9 @@ class env():
         env_vector = []
         dx, dy, dz = self.sim.getObjectPosition(self.robot, self.target)
         env_vector.extend([dx, dy, dz])
-        
+        velocity = self.sim.getObjectVelocity(self.robot)
+        [vx, vy, vz], [wx, wy, wz] = velocity
+        env_vector.extend([vx,vy,vz])
         for jointName in self.jointList:
             joint = self.jointHandler[jointName]
             joint_angle = self.sim.getJointPosition(joint)
@@ -94,7 +96,7 @@ class env():
         obj_matrix = self.sim.getObjectMatrix(self.robot, -1)
         correct_direction = obj_matrix[0]
         upsideDown = obj_matrix[10]
-        env_vector.extend([correct_direction,upsideDown])
+        # env_vector.extend([correct_direction,upsideDown])
         
         return np.array(env_vector)
     
@@ -112,6 +114,7 @@ class env():
         # 3. Not dragging belly (belly_penalty)
         # 4. Maintaining height (height_penalty)
         # 5. Reaching target (reach_bonus)
+        return dz
         return progress_reward + upside_penalty + belly_penalty + height_penalty + reach_bonus
     
     def checkBellyTouchingGround(self):

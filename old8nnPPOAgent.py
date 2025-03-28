@@ -1,13 +1,13 @@
 import torch
 import torch.nn as nn
-import numpy as np
 from torch.distributions.categorical import Categorical
 import torch.optim as optim
 import torch.nn.functional as F
+from collections import deque
+import numpy as np
 import os
 from SimulationControl import createSimulation
 from helper import plot
-
 
 class PPOMemory:
     def __init__(self,batch_size):
@@ -23,7 +23,7 @@ class PPOMemory:
         return np.array(self.buffer_states),np.array(self.buffer_actions),\
     np.array(self.buffer_rewards),np.array(self.buffer_is_terminal),np.array(self.buffer_next_states),\
     np.array(self.buffer_probs),np.array(self.buffer_state_values),np.array(self.advantages),\
-    np.array(self.buffer_returns),batches
+    batches
 
     def remember(self,state,actions,reward,next_state,done,log_probs,state_value):
         self.buffer_states.append(state)
@@ -44,7 +44,7 @@ class PPOMemory:
         self.buffer_rewards = []
         self.buffer_is_terminal = []
         self.buffer_next_states = []
-        self.buffer_returns = []
+        # self.buffer_returns = []
     
 class ActorNetwork(nn.Module):
     def __init__(self,input_size,hidden_size1,hidden_size2,hidden_size3,output_size,lr):
@@ -107,69 +107,50 @@ class CriticalNetwork(nn.Module):
 
 
 class Agent:
-    def __init__(self,gamma = 0.9,policy_clip = 0.3,batch_size = 64,N=2048,epochs = 10,n_joints = 8,input_size = 22,output_size = 3):
-        # Initial learning rates
-        self.actor_lr = 1e-4
-        self.critic_lr = 3e-4
-        
+    def __init__(self,gamma = 0.99,policy_clip = 0.2,batch_size = 5,epochs = 5,n_joints = 8,input_size = 22,output_size = 3,N = 50):
         self.critical_network = CriticalNetwork(
             input_size = input_size,
             hidden_size1 = 512,
             hidden_size2 = 256,
             hidden_size3 = 256,
             output_size = 1,
-            lr=self.critic_lr)
+            lr=1e-5)
         self.actor_networks = [ActorNetwork(input_size=input_size,
             hidden_size1 = 512,
             hidden_size2 = 256,
-            hidden_size3 = 256,
+            hidden_size3 = 128,
             output_size = output_size,
-            lr=self.actor_lr) for _ in range(n_joints)]
+            lr=1e-4) for _ in range(n_joints)]
         self.gamma = gamma
         self.clip_epsilon = policy_clip
         self.batch_size = batch_size
         self.memory = PPOMemory(batch_size=self.batch_size)
-        self.N = N
-        self.n_epochs = epochs
+        self.n_epochs = epochs #Numero de epocas que serão realizadas no processo de aprendizagem retirando informações da memória
         self.n_games = 0
-        
-        # Add entropy coefficient for exploration
-        self.entropy_coef = 0.01
-        
-        # Learning rate decay
-        self.lr_decay = 0.9995
+        self.n_steps = 0
+        self.N = N
 
     def save_models(self):
         print("... Saving models ...")
-        model_folder_path = "./models"
-        if not os.path.exists(model_folder_path):
-            os.makedirs(model_folder_path)
-        
-        # Save all actor networks
-        for i, actor_network in enumerate(self.actor_networks):
-            file_name = os.path.join(model_folder_path, f"actor_model{i}.pth")
-            torch.save(actor_network.state_dict(), file_name)
-        
-        # Save critic network
-        critic_file = os.path.join(model_folder_path, "critic_model.pth")
-        torch.save(self.critical_network.state_dict(), critic_file)
+        for i, actor in enumerate(self.actor_networks):
+            actor.save(file_name=f"actor_model{i}.pth")
+        self.critical_network.save(file_name="critical_model.pth")
 
     def load_models(self):
-        print("... Loading models ...")
-        model_folder_path = "./models"
-        
-        # Load all actor networks
-        for i, actor_network in enumerate(self.actor_networks):
-            file_name = os.path.join(model_folder_path, f"actor_model{i}.pth")
-            if os.path.exists(file_name):
-                actor_network.load_state_dict(torch.load(file_name))
-                actor_network.eval()
-        
-        # Load critic network
-        critic_file = os.path.join(model_folder_path, "critic_model.pth")
-        if os.path.exists(critic_file):
-            self.critical_network.load_state_dict(torch.load(critic_file))
-            self.critical_network.eval()
+        for i,actor in enumerate(self.actor_networks):
+            model_path = f"models/actor_model{i}.pth"
+            if os.path.exists(model_path):
+                print(f"... Loading {model_path} ...")
+                actor.load_state_dict(torch.load(model_path))
+            else:
+                print(f"...Arquivo {model_path} não encontrado, o modelo será gerado do zero")
+        model_path = "models/critical_model.pth"
+        if os.path.exists(model_path):
+            print(f"... Loading {model_path} ...")
+            self.critical_network.load_state_dict(torch.load(model_path))
+        else:
+            print(f"...Arquivo {model_path} não encontrado, o modelo será gerado do zero")
+
 
     def get_state(self,env):
         return env.getObservation()
@@ -177,64 +158,88 @@ class Agent:
     def remember(self,state,actions,reward,next_state,done,log_probs,state_value):
         self.memory.remember(state,actions,reward,next_state,done,log_probs,state_value)
 
-    def calculate_returns(self,rewards):
-        for t in range(len(rewards)):
-            discount = 1
-            discounted_reward = 0
-            for next_t in range(t,len(rewards)):
-                discounted_reward += rewards[next_t]*discount
-                discount *= self.gamma
-            self.memory.buffer_returns.append(discounted_reward)
-    
+    def calculate_returns(self, rewards):
+        returns = np.zeros_like(rewards, dtype=np.float32)
+        future_reward = 0.0  
+
+        for t in reversed(range(len(rewards))):
+            future_reward = rewards[t] + self.gamma * future_reward
+            returns[t] = future_reward
+
+        self.memory.buffer_returns = returns.tolist()
 
 
     def calculate_advantages_GAE(self, lam=0.95):
+        gamma = self.gamma
         rewards = self.memory.buffer_rewards
         values = self.memory.buffer_state_values
-        
-        # Create a padded array of values with an extra zero at the end
-        padded_values = values + [0]
-        
-        # Initialize advantages array
-        advantages = np.zeros_like(rewards, dtype=float)
-        
-        # Calculate GAE
+        advantages = np.zeros_like(rewards)
         gae = 0
         for t in reversed(range(len(rewards))):
-            delta = rewards[t] + self.gamma * padded_values[t + 1] - padded_values[t]
-            gae = delta + self.gamma * lam * gae
-            advantages[t] = gae  # Store just the GAE (removed adding values[t])
-        
-        # Normalize advantages for better training stability
-        advantages = (advantages - np.mean(advantages)) / (np.std(advantages) + 1e-8)
+            delta = rewards[t] + gamma * values[t + 1] - values[t] if t < len(rewards) - 1 else rewards[t] - values[t] #Calculo da vantagem específica do tempo T
+            gae = delta + gamma * lam * gae
+            advantages[t] = gae
         self.memory.advantages = advantages.tolist()
-        
-        # Recompute returns based on advantages and values
-        returns = advantages + np.array(values)
-        self.memory.buffer_returns = returns.tolist()
 
     def calculate_r_theta(self,state,old_probs,action,network):       
         dist = network(state.to(torch.float))
         new_probs = dist.log_prob(action)
-        # new_probs = dist.probs.gather(1,action.unsqueeze(1)).squeeze()
-        return new_probs.exp()/old_probs.exp()
+        r_theta = torch.exp(new_probs - old_probs)
         
-    def get_L_clipped(self,r_theta, advantage):
-        clipped = torch.clamp(r_theta,1-self.clip_epsilon,1+self.clip_epsilon)*advantage
-        not_clipped = r_theta*advantage
-        return -torch.min(clipped,not_clipped)
+        
+        
+        # print(f"state:{state.shape}")
+        # print(f"dist:{dist.probs.shape}")
+        # print(f"new_probs:{new_probs.shape}")
+        # print(f"r_theta: {(r_theta).shape}")
+        # print("---"*30)
+        # print(dist.logits)
+        # print(action)
+        # print(new_probs)
+        # print(r_theta)
+        # print("---"*30)
+
+        return r_theta
     
-    def complete_vectors(self):
-        self.calculate_returns(rewards=self.memory.buffer_rewards)
-        self.calculate_advantages_GAE(lam=0.95)
+    def get_L_clipped(self, r_theta, advantage, dist, c2=0.01):
+        clipped = torch.clamp(r_theta, 1-self.clip_epsilon, 1+self.clip_epsilon)*advantage
+        not_clipped = r_theta*advantage
+        min_loss = -torch.min(clipped, not_clipped)
+        
+        # Add entropy bonus
+        entropy = dist.entropy().mean()
+        entropy_bonus = -c2 * entropy  # Negative because we want to maximize entropy
+        
+        return min_loss + entropy_bonus
+
+
+    # def get_L_clipped(self,r_theta, advantage):
+    #     clipped = torch.clamp(r_theta,1-self.clip_epsilon,1+self.clip_epsilon)*advantage
+    #     not_clipped = r_theta*advantage
+    #     min_loss = -torch.min(clipped,not_clipped)
+
+    #     # print(r_theta)
+    #     # print(advantage)
+    #     # print(not_clipped)
+
+    #     # print(f"clipped: {clipped.shape}")
+    #     # print(f"not_clipped: {not_clipped.shape}")
+    #     # print(f"min_loss: {min_loss.shape}")
+
+
+
+    #     return min_loss
+
 
     def choose_actions(self,state):
         actions = []
         probs = []
         value = self.critical_network(state)
         value = torch.squeeze(value).item()
+        # print("-"*50)
         for network in self.actor_networks:
             dist = network(state)
+            # print(dist.probs)
             action = dist.sample()
             prob = torch.squeeze(dist.log_prob(action)).item()
             # print(dist.probs[action].item())
@@ -245,65 +250,63 @@ class Agent:
 
         return actions,probs,value
 
-    def train_step_batch(self,states,probs,advantages,state_values,returns,actions):
+    def train_step_batch(self,states,probs,advantages,state_values,returns,actions,c1):
+        policy_loss = 0
         for i,network in enumerate(self.actor_networks):
             curr_actions = actions[:,i]
             curr_probs = probs[:,i]
-
-            r_theta = self.calculate_r_theta(state=states,old_probs=curr_probs,action=curr_actions,network=network)
-            l_clip = self.get_L_clipped(r_theta,advantages).mean()
-            
-            # Add entropy bonus to encourage exploration
             dist = network(states.to(torch.float))
-            entropy = dist.entropy().mean()
-            actor_loss = l_clip - self.entropy_coef * entropy
+            r_theta = self.calculate_r_theta(state=states,old_probs=curr_probs,action=curr_actions,network=network)
+            l_clip = self.get_L_clipped(r_theta,advantages,dist=dist).mean()
 
-            network.optimizer.zero_grad() 
-            actor_loss.backward()
-            network.optimizer.step()
+            policy_loss += l_clip
 
         critic_value = torch.squeeze(self.critical_network(states.to(torch.float32)))
-        
-        critic_loss = F.mse_loss(critic_value, returns.to(torch.float32))
+        critic_loss = ((returns-critic_value)**2).mean()
+
+
+        total_loss = policy_loss + c1*critic_loss
+            
+        for network in self.actor_networks:
+            network.optimizer.zero_grad()
         self.critical_network.optimizer.zero_grad()
-        critic_loss.backward()
+
+        total_loss.backward()
+
+        for network in self.actor_networks:
+            network.optimizer.step()
         self.critical_network.optimizer.step()
-        return critic_loss
+
+        return total_loss
+
 
     def learn(self):
-        # Apply learning rate decay
-        if self.n_games > 0 and self.n_games % 5 == 0:
-            self.actor_lr *= self.lr_decay
-            self.critic_lr *= self.lr_decay
-            
-            # Update optimizers with new learning rates
-            for network in self.actor_networks:
-                for param_group in network.optimizer.param_groups:
-                    param_group['lr'] = self.actor_lr
-                    
-            for param_group in self.critical_network.optimizer.param_groups:
-                param_group['lr'] = self.critic_lr
-        
-        total_mse = 0
         for epoch in range(self.n_epochs):
+            self.calculate_advantages_GAE(lam=0.95)
             states,actions,rewards,terminals,\
             next_states,probs,state_values,\
-            advantages, returns, batches = self.memory.generate_batches()
+            advantages, batches = self.memory.generate_batches()
+            
+
             l_mse = []
             for batch in batches:
                 t_actions = torch.tensor(actions[batch])
                 t_states = torch.tensor(states[batch])
                 t_old_probs = torch.tensor(probs[batch])
                 t_state_values = torch.tensor(state_values[batch])
-                t_returns = torch.tensor(returns[batch])
                 t_advantages = torch.tensor(advantages[batch])
+                t_rewards = torch.tensor(rewards[batch])
 
-                mse = self.train_step_batch(t_states,t_old_probs,t_advantages,t_state_values,t_returns,t_actions)
+                nn_pred = self.critical_network(torch.tensor(t_states,dtype=torch.float)).squeeze()
+                returns = t_rewards+self.gamma*nn_pred
+                # returns = t_advantages + t_state_values
+                t_advantages = (t_advantages - t_advantages.mean()) / (t_advantages.std() + 1e-8)
+
+
+                mse = self.train_step_batch(t_states,t_old_probs,t_advantages,t_state_values,returns,t_actions,c1 = 0.5)
                 l_mse.append(mse)
-            total_mse += sum(l_mse) / len(l_mse)
-        
-        avg_mse = total_mse / self.n_epochs
-        return avg_mse
+        self.memory.clear_memory()
+        return sum(l_mse) / len(l_mse)
 
             
 def train():
@@ -313,67 +316,38 @@ def train():
     total_score = 0
     record = float("-inf")
     agent = Agent()
+    agent.load_models()
     simulation = createSimulation("cpu")
     simulation.reset()
-    
-    # For tracking improvement
-    no_improvement_count = 0
-    best_avg_score = float("-inf")
-    
-    episode_count = 0
-    max_episodes = 10000  # Set a maximum number of episodes
-    
-    while episode_count < max_episodes:
+    last_scores = deque(maxlen=100)
+    mse_buffer = []
+    while True:
         state_old = agent.get_state(env = simulation)
-        final_move, action_probs, state_value = agent.choose_actions(state = torch.tensor(state_old, dtype=torch.float))
+        final_move,action_probs,state_value = agent.choose_actions(state = torch.tensor(state_old,dtype=torch.float))
         reward, done, score = simulation.step(actions = final_move)
         state_new = agent.get_state(env = simulation)
-        
-        agent.remember(state=state_old, actions=final_move, reward=reward,
-                      next_state=state_new, done=done, state_value=state_value, log_probs=action_probs)
-        
+        agent.remember(state=state_old,actions=final_move,reward=reward,
+                       next_state=state_new,done=done,state_value=state_value,log_probs=action_probs)
+        agent.n_steps += 1
+        if agent.n_steps % agent.N == 0 and agent.n_steps != 0:
+            temp_mse = agent.learn()
+            mse_buffer.append(temp_mse.item())
         if done:
-            agent.complete_vectors()
-            mse = agent.learn()
-            agent.memory.clear_memory()
             simulation.reset()
             agent.n_games += 1
-            episode_count += 1
+            agent.n_steps = 0
+            plot_mse.append(sum(mse_buffer)/len(mse_buffer))
+            mse_buffer = []
 
-            # Save best model
             if score > record:
                 record = score
                 agent.save_models()
-                print(f"New record: {record}")
-                no_improvement_count = 0
-            else:
-                no_improvement_count += 1
-            
-            # Calculate running average over last 100 episodes
+            print(f"Game:{agent.n_games}   |Score:{score}     |Record:{record}")
             plot_scores.append(score)
-            plot_mse.append(mse.item())
-            total_score += score
-            mean_score = total_score / agent.n_games
+            last_scores.append(score)
+            mean_score = sum(last_scores)/len(last_scores)
             plot_mean_scores.append(mean_score)
-            
-            # Check if recent average performance is improving
-            if len(plot_scores) >= 100:
-                recent_avg = sum(plot_scores[-100:]) / 100
-                if recent_avg > best_avg_score:
-                    best_avg_score = recent_avg
-                    print(f"New best average: {best_avg_score}")
-                    no_improvement_count = 0
-            
-            print(f"Game:{agent.n_games}   |Score:{score:.2f}   |Record:{record:.2f}   |Mean:{mean_score:.2f}   |MSE:{mse.item():.6f}")
-            
-            # Early stopping if no improvement for many episodes
-            if no_improvement_count >= 100:
-                print("No improvement for 100 episodes. Early stopping.")
-                # break
-            
-            # Plot progress
-            if agent.n_games % 10 == 0:
-                plot(plot_scores, plot_mean_scores, plot_mse)
+            plot(plot_scores,plot_mean_scores,plot_mse)
 
 
 if __name__ == "__main__":
