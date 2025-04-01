@@ -107,7 +107,7 @@ class CriticalNetwork(nn.Module):
 
 
 class Agent:
-    def __init__(self,gamma = 0.99,policy_clip = 0.2,batch_size = 5,epochs = 5,n_joints = 8,input_size = 22,output_size = 3,N = 50):
+    def __init__(self,gamma = 0.99,policy_clip = 0.2,batch_size = 50,epochs = 5,n_joints = 8,input_size = 23,output_size = 3,N = 50):
         self.critical_network = CriticalNetwork(
             input_size = input_size,
             hidden_size1 = 512,
@@ -269,15 +269,18 @@ class Agent:
             
         for network in self.actor_networks:
             network.optimizer.zero_grad()
-        self.critical_network.optimizer.zero_grad()
+        
 
-        total_loss.backward()
+        policy_loss.backward()
 
         for network in self.actor_networks:
             network.optimizer.step()
+
+        self.critical_network.optimizer.zero_grad()
+        critic_loss.backward()
         self.critical_network.optimizer.step()
 
-        return total_loss
+        return critic_loss
 
 
     def learn(self):
@@ -290,6 +293,8 @@ class Agent:
 
             l_mse = []
             for batch in batches:
+                if batch.size == 1:
+                    continue
                 t_actions = torch.tensor(actions[batch])
                 t_states = torch.tensor(states[batch])
                 t_old_probs = torch.tensor(probs[batch])
@@ -299,7 +304,7 @@ class Agent:
 
                 nn_pred = self.critical_network(torch.tensor(t_states,dtype=torch.float)).squeeze()
                 returns = t_rewards+self.gamma*nn_pred
-                # returns = t_advantages + t_state_values
+                
                 t_advantages = (t_advantages - t_advantages.mean()) / (t_advantages.std() + 1e-8)
 
 
@@ -313,14 +318,12 @@ def train():
     plot_scores = []
     plot_mean_scores = []
     plot_mse = []
-    total_score = 0
     record = float("-inf")
     agent = Agent()
     agent.load_models()
     simulation = createSimulation("cpu")
     simulation.reset()
     last_scores = deque(maxlen=100)
-    mse_buffer = []
     while True:
         state_old = agent.get_state(env = simulation)
         final_move,action_probs,state_value = agent.choose_actions(state = torch.tensor(state_old,dtype=torch.float))
@@ -328,20 +331,16 @@ def train():
         state_new = agent.get_state(env = simulation)
         agent.remember(state=state_old,actions=final_move,reward=reward,
                        next_state=state_new,done=done,state_value=state_value,log_probs=action_probs)
-        agent.n_steps += 1
-        if agent.n_steps % agent.N == 0 and agent.n_steps != 0:
-            temp_mse = agent.learn()
-            mse_buffer.append(temp_mse.item())
         if done:
+            temp_mse = agent.learn()
             simulation.reset()
             agent.n_games += 1
-            agent.n_steps = 0
-            plot_mse.append(sum(mse_buffer)/len(mse_buffer))
-            mse_buffer = []
+            plot_mse.append(temp_mse.item())
 
             if score > record:
                 record = score
                 agent.save_models()
+
             print(f"Game:{agent.n_games}   |Score:{score}     |Record:{record}")
             plot_scores.append(score)
             last_scores.append(score)

@@ -68,7 +68,7 @@ class env():
         return self.sim.getSimulationTime() >= time
         
     def checkDone(self):
-        return (self.checkFall() or self.checkArrival() or self.checkSimTime(25))
+        return (self.checkFall() or self.checkArrival() or self.checkBellyTouchingGround() or self.checkSimTime(60))
 
     def translateAction(self, action:int,joint):
         match action:
@@ -96,30 +96,27 @@ class env():
         obj_matrix = self.sim.getObjectMatrix(self.robot, -1)
         correct_direction = obj_matrix[0]
         upsideDown = obj_matrix[10]
+        env_vector.extend([correct_direction])
+
         # env_vector.extend([correct_direction,upsideDown])
         
         return np.array(env_vector)
     
-    def getReward(self):
+    def getReward(self,k_distance = 30,k_speed = 1,k_laydown = -1000,k_pitch = -1,k_fall = -1000, k_yOffset = -1, k_reach = 0,k_effort = 0):
         dx, dy, dz = self.sim.getObjectPosition(self.robot, self.target)
-        upside_penalty = -10 if self.checkUpsideDown() else 0
-        reach_bonus = 100 if dx < 1 else 0  # Big bonus for reaching target
-        progress_reward = -dx  # Reward for moving toward target
-        belly_penalty = -5 if self.checkBellyTouchingGround() else 0
-        height_penalty = -5 if dz < 0.15 else 0  # Penalize being too low
-        
-        # Combined reward to encourage:
-        # 1. Moving toward target (progress_reward)
-        # 2. Staying upright (upside_penalty)
-        # 3. Not dragging belly (belly_penalty)
-        # 4. Maintaining height (height_penalty)
-        # 5. Reaching target (reach_bonus)
-        return dz
-        return progress_reward + upside_penalty + belly_penalty + height_penalty + reach_bonus
+        [vx, vy, vz], [wx, wy, wz] = self.sim.getObjectVelocity(self.robot)
+
+        reach = self.checkArrival()
+        laydown = self.checkBellyTouchingGround()
+        fall = self.checkFall()
+        pitch_angle = self.sim.getObjectOrientation(self.robot, -1)[1]
+
+
+        return k_distance/dx + k_speed*vx + k_laydown*laydown + k_pitch*abs(pitch_angle) + k_reach*reach + k_fall*fall +k_yOffset*abs(dy)
     
     def checkBellyTouchingGround(self):
         dx, dy, dz = self.sim.getObjectPosition(self.robot, self.target)
-        return dz < 0.15
+        return dz < 0.2 #era 0.15
 
     def checkUpsideDown(self):
         obj_matrix = self.sim.getObjectMatrix(self.robot, -1)
