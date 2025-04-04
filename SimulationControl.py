@@ -62,7 +62,7 @@ class env():
 
     def checkArrival(self):
         dx, dy, dz = self.sim.getObjectPosition(self.robot, self.target)
-        return dx < 1
+        return abs(dx) < 1
 
     def checkSimTime(self,time):
         return self.sim.getSimulationTime() >= time
@@ -102,21 +102,35 @@ class env():
         
         return np.array(env_vector)
     
-    def getReward(self,k_distance = 30,k_speed = 1,k_laydown = -1000,k_pitch = -1,k_fall = -1000, k_yOffset = -1, k_reach = 0,k_effort = 0):
+    def getReward(self,k_distance = 1,k_speed = 25,k_angular_speed = -1, k_laydown = -1000,k_yaw = -0.5, k_pitch = -0.5,k_roll = -0.5,k_fall = -1000, k_yOffset = -1, k_reach = 0,k_effort = 0):
         dx, dy, dz = self.sim.getObjectPosition(self.robot, self.target)
         [vx, vy, vz], [wx, wy, wz] = self.sim.getObjectVelocity(self.robot)
-
         reach = self.checkArrival()
         laydown = self.checkBellyTouchingGround()
         fall = self.checkFall()
         pitch_angle = self.sim.getObjectOrientation(self.robot, -1)[1]
+        roll_angle = self.sim.getObjectOrientation(self.robot, -1)[0]
+        yaw_angle = self.sim.getObjectOrientation(self.robot, -1)[2] #para frente é 3.14
 
+        d_max = 25
 
-        return k_distance/dx + k_speed*vx + k_laydown*laydown + k_pitch*abs(pitch_angle) + k_reach*reach + k_fall*fall +k_yOffset*abs(dy)
+        reward = 0
+        reward += k_distance * (d_max - abs(dx))
+        reward += k_speed*vx
+        reward += k_laydown*laydown
+        reward += k_yaw*abs((abs(yaw_angle)-math.pi))
+        reward += k_pitch*abs(pitch_angle)
+        reward += k_roll*abs(roll_angle)
+        reward += k_reach*reach
+        reward += k_fall*fall
+        reward += k_yOffset*abs(dy)
+        reward += abs(wx)+abs(wy)+abs(wz) * k_angular_speed
+
+        return  reward
     
     def checkBellyTouchingGround(self):
         dx, dy, dz = self.sim.getObjectPosition(self.robot, self.target)
-        return dz < 0.2 #era 0.15
+        return dz < 0.15 #era 0.15
 
     def checkUpsideDown(self):
         obj_matrix = self.sim.getObjectMatrix(self.robot, -1)

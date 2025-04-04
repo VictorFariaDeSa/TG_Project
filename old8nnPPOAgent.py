@@ -23,7 +23,7 @@ class PPOMemory:
         return np.array(self.buffer_states),np.array(self.buffer_actions),\
     np.array(self.buffer_rewards),np.array(self.buffer_is_terminal),np.array(self.buffer_next_states),\
     np.array(self.buffer_probs),np.array(self.buffer_state_values),np.array(self.advantages),\
-    batches
+    np.array(self.buffer_returns),batches
 
     def remember(self,state,actions,reward,next_state,done,log_probs,state_value):
         self.buffer_states.append(state)
@@ -44,7 +44,7 @@ class PPOMemory:
         self.buffer_rewards = []
         self.buffer_is_terminal = []
         self.buffer_next_states = []
-        # self.buffer_returns = []
+        self.buffer_returns = []
     
 class ActorNetwork(nn.Module):
     def __init__(self,input_size,hidden_size1,hidden_size2,hidden_size3,output_size,lr):
@@ -107,7 +107,7 @@ class CriticalNetwork(nn.Module):
 
 
 class Agent:
-    def __init__(self,gamma = 0.99,policy_clip = 0.2,batch_size = 50,epochs = 5,n_joints = 8,input_size = 23,output_size = 3,N = 50):
+    def __init__(self,gamma = 0.99,policy_clip = 0.2,batch_size = 10,epochs = 5,n_joints = 8,input_size = 23,output_size = 3,N = 50):
         self.critical_network = CriticalNetwork(
             input_size = input_size,
             hidden_size1 = 512,
@@ -284,11 +284,12 @@ class Agent:
 
 
     def learn(self):
+        self.calculate_returns(self.memory.buffer_rewards)
         for epoch in range(self.n_epochs):
             self.calculate_advantages_GAE(lam=0.95)
             states,actions,rewards,terminals,\
             next_states,probs,state_values,\
-            advantages, batches = self.memory.generate_batches()
+            advantages, returns, batches = self.memory.generate_batches()
             
 
             l_mse = []
@@ -297,18 +298,20 @@ class Agent:
                     continue
                 t_actions = torch.tensor(actions[batch])
                 t_states = torch.tensor(states[batch])
+                t_next_states = torch.tensor(next_states[batch])
                 t_old_probs = torch.tensor(probs[batch])
                 t_state_values = torch.tensor(state_values[batch])
                 t_advantages = torch.tensor(advantages[batch])
                 t_rewards = torch.tensor(rewards[batch])
+                t_returns = torch.tensor(returns[batch])
 
-                nn_pred = self.critical_network(torch.tensor(t_states,dtype=torch.float)).squeeze()
-                returns = t_rewards+self.gamma*nn_pred
-                
+                # nn_pred = self.critical_network(torch.tensor(t_next_states,dtype=torch.float)).squeeze()
+                # returns = t_rewards+self.gamma*nn_pred
+                #Calcular os retornos direto aqui não seria melhor?
                 t_advantages = (t_advantages - t_advantages.mean()) / (t_advantages.std() + 1e-8)
 
 
-                mse = self.train_step_batch(t_states,t_old_probs,t_advantages,t_state_values,returns,t_actions,c1 = 0.5)
+                mse = self.train_step_batch(t_states,t_old_probs,t_advantages,t_state_values,t_returns,t_actions,c1 = 0.5)
                 l_mse.append(mse)
         self.memory.clear_memory()
         return sum(l_mse) / len(l_mse)
@@ -332,6 +335,7 @@ def train():
         agent.remember(state=state_old,actions=final_move,reward=reward,
                        next_state=state_new,done=done,state_value=state_value,log_probs=action_probs)
         if done:
+            print("done")
             temp_mse = agent.learn()
             simulation.reset()
             agent.n_games += 1
