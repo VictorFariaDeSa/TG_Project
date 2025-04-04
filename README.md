@@ -37,6 +37,7 @@ pip install -r requirements.txt
    
    - **`simulation2.ttt`** → Upper and lower joints move from -90º to 90º.
    - **`simulation4.ttt`** → Upper joints move from -45º to 45º, and lower joints move from -90º to 90º.
+   - **`simulation6.ttt`** → Longer legs Upper joints move from -90º to 90º, and lower joints move from 0º to 135º.
    
    You can open the latest simulation version directly by running:
    ```bash
