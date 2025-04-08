@@ -47,6 +47,17 @@ class env():
         self.score+= self.getReward()
         return self.getReward(), self.checkDone(), self.score
 
+
+
+    def C_step(self,actions):
+        for joint_index, jointName in enumerate(self.jointList):
+                joint = self.jointHandler[jointName]
+                self.sim.setJointTargetVelocity(joint, actions[joint_index].item())
+        self.sim.step()
+        self.score+= self.getReward()
+        return self.getReward(), self.checkDone(), self.score
+
+
     def reset(self):
         self.score = 0
         self.sim.stopSimulation()
@@ -102,7 +113,20 @@ class env():
         
         return np.array(env_vector)
     
-    def getReward(self,k_distance = 1,k_speed = 25,k_angular_speed = -1, k_laydown = -1000,k_yaw = -0.5, k_pitch = -0.5,k_roll = -0.5,k_fall = -1000, k_yOffset = -1, k_reach = 0,k_effort = 0):
+
+    def get_ok_height(self):
+        dx, dy, dz = self.sim.getObjectPosition(self.robot, self.target)
+        return dz > 0.3
+    
+    def check_vel_0(self):
+        [vx, vy, vz], [wx, wy, wz] = self.sim.getObjectVelocity(self.robot)
+        return vx < 0.1
+
+    def getReward(self,k_distance = 5,k_speed = 5,k_vel_zero = -1,k_height = -10, k_angular_speed = -1, k_laydown = -1000,k_yaw = -0.5, k_pitch = -0.5,k_roll = -0.5,k_fall = -10000, k_yOffset = -1, k_reach = 0,k_effort = 0):
+        
+        height_goal = 0.35
+        d_max = 25
+        
         dx, dy, dz = self.sim.getObjectPosition(self.robot, self.target)
         [vx, vy, vz], [wx, wy, wz] = self.sim.getObjectVelocity(self.robot)
         reach = self.checkArrival()
@@ -111,20 +135,26 @@ class env():
         pitch_angle = self.sim.getObjectOrientation(self.robot, -1)[1]
         roll_angle = self.sim.getObjectOrientation(self.robot, -1)[0]
         yaw_angle = self.sim.getObjectOrientation(self.robot, -1)[2] #para frente é 3.14
+        vel_0 = self.check_vel_0()
 
-        d_max = 25
+        
 
         reward = 0
         reward += k_distance * (d_max - abs(dx))
         reward += k_speed*vx
-        reward += k_laydown*laydown
+        reward += k_reach*reach
+        
+
+
+        reward += k_height*abs(dz-height_goal)
         reward += k_yaw*abs((abs(yaw_angle)-math.pi))
         reward += k_pitch*abs(pitch_angle)
         reward += k_roll*abs(roll_angle)
-        reward += k_reach*reach
         reward += k_fall*fall
         reward += k_yOffset*abs(dy)
         reward += abs(wx)+abs(wy)+abs(wz) * k_angular_speed
+        reward += k_vel_zero*vel_0
+        reward += k_laydown*laydown
 
         return  reward
     
