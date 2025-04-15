@@ -102,8 +102,8 @@ class PPO_NN(nn.Module):
         return dist, value
 
 class PPO_Agent:
-    def __init__(self):
-        self.PPO_network = PPO_NN(num_inputs=NUM_INPUTS,num_outputs=NUM_OUTPUTS,hidden_size1=HIDDEN_SIZE1,hidden_size2=HIDDEN_SIZE2,hidden_size3=HIDDEN_SIZE3)
+    def __init__(self,num_inputs=NUM_INPUTS,num_outputs=NUM_OUTPUTS):
+        self.PPO_network = PPO_NN(num_inputs=num_inputs,num_outputs=num_outputs,hidden_size1=HIDDEN_SIZE1,hidden_size2=HIDDEN_SIZE2,hidden_size3=HIDDEN_SIZE3)
         self.optimizer = optim.Adam(self.PPO_network.parameters(), lr=LEARNING_RATE)
         self.gamma = GAMMA
         self.clip_epsilon = POLICY_CLIP
@@ -134,7 +134,7 @@ class PPO_Agent:
         entropy = dist.entropy().mean()
         new_log_probs = dist.log_prob(action).squeeze()
         ratio = (new_log_probs - old_log_probs).exp()
-
+        print(entropy)
         adv = advantages.unsqueeze(1)       
         surr1 = ratio * adv
         surr2 = torch.clamp(ratio, 1.0 - self.clip_epsilon, 1.0 + self.clip_epsilon) * adv
