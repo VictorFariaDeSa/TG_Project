@@ -54,7 +54,7 @@ class env():
 
 
     def C_step(self,actions):
-        return self.getReward(), self.checkDone(), self.score
+        return self.getReward(actions), self.checkDone(), self.score
 
 
     def reset(self):
@@ -123,14 +123,14 @@ class env():
         [vx, vy, vz], [wx, wy, wz] = self.sim.getObjectVelocity(self.robot)
         return vx < 0.1
 
-    def getReward(self,k_distance = 250,k_energy = -0.1,k_speed = 5,k_vel_zero = -1,k_height = -10, k_angular_speed = -1, k_laydown = -1000,k_stable = 1, k_yOffset = -5, k_reach = 100000,k_effort = 0):
+    def getReward(self,actions,k_distance = 250,k_energy = -0.1,k_speed = 5,k_vel_zero = -1,k_height = -10, k_angular_speed = -1, k_laydown = -1000,k_stable = 1, k_yOffset = -5, k_reach = 100000,k_effort = 0):
         
         height_goal = 0.35
         d_max = 25
         
         dx, dy, dz = self.sim.getObjectPosition(self.robot, self.target)
 
-        dx_gain = self.last_dx-dx
+        dx_gain = abs(self.last_dx)-abs(dx)
         dy_gain = abs(self.last_dy)-abs(dy)
 
         self.last_dx = dx

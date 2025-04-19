@@ -5,7 +5,7 @@ import torch
 from torch.distributions import Normal
 import numpy as np
 import torch.optim as optim
-
+import os
 
 class PPOMemory:
     def __init__(self,batch_size):
@@ -61,7 +61,7 @@ class PPO_NN(nn.Module):
             in_features = out_features
         
         critic_layers.append(nn.Linear(in_features, 1))
-        actor_layers.append(nn.Linear(in_features, num_outputs))
+        actor_layers.append(nn.Linear(in_features,num_outputs))
 
 
         self.critic = nn.Sequential(*critic_layers)
@@ -70,11 +70,76 @@ class PPO_NN(nn.Module):
 
     def forward(self, x):
         value = self.critic(x)
-        mu    = self.actor(x).unsqueeze(0)
-        std   = self.log_std.exp().expand_as(mu)
+        mu    = torch.tanh(self.actor(x))
+        std = self.log_std.squeeze(0).exp().expand_as(mu)
         dist  = Normal(mu, std)
         return dist, value
+    
+    def save(self,actor_file_name="actor_model.pth",critic_file_name = "critic_model.pth"):
+        model_folder_path = "./models"
+        if not os.path.exists(model_folder_path):
+            os.makedirs(model_folder_path)
+        complete_actor_name = os.path.join(model_folder_path,actor_file_name)
+        complete_critic_name = os.path.join(model_folder_path,critic_file_name)  
+        torch.save(self.critic.state_dict(),complete_critic_name)
+        torch.save(self.actor.state_dict(),complete_actor_name)
 
+class ActorNetwork(nn.Module):
+    def __init__(self,input_size,inner_dimensions,output_size,lr,std):
+        super().__init__()
+
+        in_features = input_size
+        actor_layers = []
+        for out_features in inner_dimensions:
+            actor_layers.append(nn.Linear(in_features, out_features))
+            actor_layers.append(nn.Tanh())
+            in_features = out_features
+        
+        actor_layers.append(nn.Linear(in_features, output_size))
+
+        self.actor = nn.Sequential(*actor_layers)
+        self.log_std = nn.Parameter(torch.ones(1, output_size) * std)
+        self.optimizer = optim.Adam(self.parameters(),lr=lr)
+        
+    def forward(self, state):
+        mu = self.actor(state)
+        std = torch.exp(self.log_std)  # garantir que std seja positivo
+        dist = Normal(mu, std)
+        return dist
+    
+    def save(self,file_name="actor.pth"):
+        model_folder_path = "./models"
+        if not os.path.exists(model_folder_path):
+            os.makedirs(model_folder_path)
+        file_name = os.path.join(model_folder_path,file_name)
+        torch.save(self.state_dict(),file_name)
+
+class CriticalNetwork(nn.Module):
+    def __init__(self,input_size,inner_dimensions,output_size,lr):
+        super().__init__()
+        in_features = input_size
+        critic_layers = []
+        for out_features in inner_dimensions:
+            critic_layers.append(nn.Linear(in_features, out_features))
+            critic_layers.append(nn.ReLU())
+            in_features = out_features
+        
+        critic_layers.append(nn.Linear(in_features, output_size))
+
+        self.critic = nn.Sequential(*critic_layers)
+        self.optimizer = optim.Adam(self.parameters(),lr=lr)
+
+        
+    def forward(self,state):
+        value = self.critic(state)
+        return value
+
+    def save(self,file_name="critic.pth"):
+        model_folder_path = "./models"
+        if not os.path.exists(model_folder_path):
+            os.makedirs(model_folder_path)
+        file_name = os.path.join(model_folder_path,file_name)
+        torch.save(self.state_dict(),file_name)
 
 class Agent:
     def __init__(self,env,gamma,lam,policy_clip,input_size,inner_dimensions,n_joints,lr,epochs,batch_size,c1,c2):
@@ -93,24 +158,37 @@ class Agent:
                          num_inputs = input_size,
                          num_outputs=n_joints)
         self.optimizer = optim.Adam(self.nn.parameters(),lr=lr)
+
+        # self.actor = ActorNetwork(input_size = input_size,
+        #                           inner_dimensions = inner_dimensions,
+        #                           output_size = n_joints,
+        #                           lr = lr,
+        #                           std=0.0)
+        # self.critic = CriticalNetwork(input_size= input_size,
+        #                               inner_dimensions= inner_dimensions,
+        #                               output_size=1,
+        #                               lr=lr)
         self.c1 = c1
         self.c2 = c2
         self.last_observation,info = self.env.reset()
         self.action_low = torch.tensor(env.action_space.low, dtype=torch.float32)
         self.action_high = torch.tensor(env.action_space.high, dtype=torch.float32)
+        self.load_model()
+        self.best_score = float("-inf")
 
 
     def train_step(self):
         dist, value = self.nn(torch.tensor(self.last_observation,dtype=torch.float))
+        # dist = self.actor(torch.tensor(self.last_observation,dtype=torch.float))
+        # value = self.critic(torch.tensor(self.last_observation,dtype=torch.float))
         value = value.item()
         action = dist.sample().squeeze(0)
         log_prob = dist.log_prob(action).squeeze()
         action = action.detach().numpy()
-        action_clipped = torch.clamp(torch.from_numpy(action), self.action_low, self.action_high)
-        new_observation, reward, terminated,truncated, info = self.env.step(action_clipped)
+        new_observation, reward, terminated,truncated, info = self.env.step(action)
         self.memory.remember(
             state = self.last_observation,
-            actions = action_clipped,
+            actions = action,
             reward = reward,
             done = terminated,
             next_state = new_observation,
@@ -119,9 +197,16 @@ class Agent:
         )
         self.last_observation = new_observation
         if terminated or truncated:
-            _,next_value = self.nn(torch.tensor(new_observation,dtype=torch.float))
+            if not terminated:
+                _, next_value = self.nn(torch.tensor(new_observation, dtype=torch.float))
+            else:
+                next_value = torch.tensor([0.], dtype=torch.float)
+            # next_value = self.critic(torch.tensor(new_observation,dtype=torch.float))
             self.learn(next_value = next_value)
             self.last_observation, info = self.env.reset()
+            if info["score"] > self.best_score:
+                self.best_score = info["score"]
+                self.save_model()
 
 
     def learn(self,next_value = None):
@@ -160,6 +245,8 @@ class Agent:
 
     def train_step_batch(self,states,actions,rewards,next_states,terminals,returns,old_probs,state_values,advantages,c1,c2):
         dist, value = self.nn(torch.tensor(states,dtype=torch.float))
+        # dist = self.actor(torch.tensor(states,dtype=torch.float))
+        # value = self.critic(torch.tensor(states,dtype=torch.float))
         new_probs = dist.log_prob(actions)
 
         r_theta = torch.exp(new_probs - old_probs).squeeze()
@@ -169,31 +256,44 @@ class Agent:
         min_loss = -torch.min(clipped, not_clipped).mean()
         entropy = dist.entropy().mean()
 
+        policy_loss = min_loss - c2*entropy
+
         mse_loss = ((returns - value)**2).mean()
-        loss_function = min_loss - c1*mse_loss + c2*entropy
+        loss_function = min_loss + c1*mse_loss - c2*entropy
+
+
 
         self.optimizer.zero_grad()
         loss_function.backward()
         self.optimizer.step()
 
+        # self.actor.optimizer.zero_grad()
+        # policy_loss.backward()
+        # self.actor.optimizer.step()
 
-    def calculate_GAE(self,next_value):
+        # self.critic.optimizer.zero_grad()
+        # mse_loss.backward()
+        # self.critic.optimizer.step()
+
+
+    def calculate_GAE(self,next_value = None):
         rewards = self.memory.buffer_rewards
-        if next_value:
+        if next_value != None:
             values = self.memory.buffer_state_values + [next_value]
         else:
             values = self.memory.buffer_state_values
         advantages = np.zeros_like(rewards)
+        returns = np.zeros_like(rewards)
         gae = 0
         for t in reversed(range(len(self.memory.buffer_state_values))):
             mask = (1-self.memory.buffer_is_terminal[t])
             delta = rewards[t] + self.gamma * values[t + 1] * mask - values[t]
             gae = delta + self.gamma * self.lam * mask * gae
             advantages[t] = gae
-        returns = advantages + self.memory.buffer_state_values
+            returns[t] = gae + values[t]
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-        return advantages.tolist(),returns
+        return advantages.tolist(),returns.tolist()
 
     def calculate_returns(self):
         returns = (np.array(self.memory.buffer_advantages) + np.array(self.memory.buffer_state_values)).tolist()
@@ -209,15 +309,23 @@ class Agent:
         else:
             for step in range(n_steps):
                 self.train_step()
-                
 
+    def save_model(self):
+        print("... Saving models ...")
+        self.nn.save()
+        # self.actor.save()
+        # self.critic.save()
 
+    def load_model(self):
+        if os.path.exists("models/critic_model.pth") and os.path.exists("models/actor_model.pth"):
+            print("...Loading Model...")
+            self.nn.critic.load_state_dict(torch.load("models/critic_model.pth"))
+            self.nn.actor.load_state_dict(torch.load("models/actor_model.pth"))
+            # self.actor.load_state_dict(torch.load("models/actor.pth"))
+            # self.critic.load_state_dict(torch.load("models/critic.pth"))
 
-
-
-
-
-
+        else:
+            print("File no found, no model will be loaded")
 
 
 if __name__ == "__main__":
@@ -229,14 +337,14 @@ if __name__ == "__main__":
         lam = 0.95,
         policy_clip = 0.2,
         input_size = env.observation_space.shape[0],
-        inner_dimensions = [512, 256, 128],
+        inner_dimensions = [216, 216, 128],
         n_joints = env.action_space.shape[0],
         lr = 1e-4,
         epochs = 5,
         batch_size = 64,
         env = env,
         c1 = 0.5,
-        c2 = 0.01
+        c2 = 0.001
         )
 
     model.train()

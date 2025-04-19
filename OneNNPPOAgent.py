@@ -63,8 +63,9 @@ class ActorNetwork(nn.Module):
             nn.Tanh(), 
         )
         self.mu_head = self.linear4
-        self.log_std = nn.Parameter(torch.zeros(output_size))
         self.optimizer = optim.Adam(self.parameters(),lr=lr)
+        self.log_std = nn.Parameter(torch.zeros(output_size))
+
 
     def forward(self, state):
         x = self.base(state)
