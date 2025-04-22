@@ -9,7 +9,7 @@ from collections import deque
 import numpy as np
 import os
 from SimulationControl import createSimulation
-from helper import plot
+from helpers.plot_helper import plot
 
 MAX_MEMORY = 10000
 

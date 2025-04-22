@@ -31,6 +31,6 @@ def plot(scores,last_scores,mse=None):
     lower_limit = min(min(mean_scores),min(last_scores))
     upper_limit = max(max(mean_scores),max(last_scores))
     delta = upper_limit - lower_limit
-    ax1.set_ylim([lower_limit-0.1*delta,upper_limit+0.1*delta])
+    # ax1.set_ylim([lower_limit-0.1*delta,upper_limit+0.1*delta])
     plt.show(block=False)
     plt.pause(.1)
