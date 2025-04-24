@@ -8,14 +8,16 @@ from RL_env.Doggy_robot import Doggy_robot
 from helpers.coppelia_helper import create_stepped_sim,reset_sim,start_sim
 
 MAX_STEPS = 1000
+HIGH_ACTION = 1
+LOW_ACTION = -1
 
 class Doggy_walker_env(gym.Env):
     metadata = {"render_modes": [], "render_fps": 60}
 
     def __init__(self):
         super().__init__()
-        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(8,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(23,), dtype=np.float32)
+        self.action_space = spaces.Box(low=LOW_ACTION, high=HIGH_ACTION, shape=(8,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(31,), dtype=np.float32)
 
         self.sim = create_stepped_sim()
         
@@ -29,11 +31,12 @@ class Doggy_walker_env(gym.Env):
 
         
     def step(self, action):
-        self.robot.input_speed_actions(action)
+        actions = np.clip(action,LOW_ACTION,HIGH_ACTION)
+        self.robot.input_speed_actions(actions)
         self.sim.step()
         self.n_steps += 1
         obs = self.get_observation()
-        reward = self.get_reward(action)
+        reward = self.get_reward(actions)
         done = self.check_done()
         truncated = self.n_steps >= MAX_STEPS
 
@@ -73,38 +76,24 @@ class Doggy_walker_env(gym.Env):
         height_goal = 0.35
 
         dx_bonus = +(dx) * 1000.0
-        height_bonus = +(z) * 1.0
+        height_bonus = +(z>0.25) * 5.0
         laydown_bonus = -(laydown) * 1000.0
         stable_bonus = (1 if stable else -1) * 1.0
         pitch_bonus = - (abs(pitch)) * 1.0
         progress_bonus = + (25-abs(x)) * 5
-
-        speed_bonus = vx*5
-        reached_bonus = reached*0
-        correct_height_bonus = abs(z-height_goal)*-10
-        yaw_bonus = yaw * -0.5
-        pitch_bonus = pitch * -0.5
-        roll_bonus = roll*-0.5
-        y_offset_bonus = abs(y) * -1
-        ang_speed_bonus = abs(wx)+abs(wy)+abs(wz) * -1
-        vel_0_bonus = (vx<0.1) * -1
-        laydown_bonus = laydown*-1000
-        
-
+        speed_bonus = + (vx) * 5
+        yaw_bonus = - (abs(yaw)) * 1 
 
 
         reward = (
             dx_bonus
-            + speed_bonus
-            + reached_bonus
-            + correct_height_bonus
-            + yaw_bonus
-            + pitch_bonus
-            + roll_bonus
-            + y_offset_bonus
-            + ang_speed_bonus
-            + vel_0_bonus
+            + height_bonus
             + laydown_bonus
+            + stable_bonus
+            + pitch_bonus
+            + progress_bonus
+            + speed_bonus
+            + yaw_bonus
         )
 
         return float(reward)
@@ -119,19 +108,16 @@ class Doggy_walker_env(gym.Env):
         joints_data = self.robot.get_all_joints_information()
 
         obs.extend([x, y, z])
-        # obs.extend([roll,pitch,yaw])
-        # obs.extend([vx, vy, vz, wx, wy, wz])
+        obs.extend([roll,pitch,yaw])
+        obs.extend([vx, vy, vz, wx, wy, wz])
         obs.extend([vx,vy,vz])
         obs.extend(joints_data)
 
-        #TODO descobrir o que é isso
-        matrix = self.robot.get_matrix()
-        obs.append(matrix[0])
 
         return np.array(obs, dtype=np.float32)
 
     def check_done(self):
-        return self.robot.check_fall() or self.robot.check_arrival() #or not self.robot.cg_inside(tolerance=1)
+        return self.robot.check_fall() or self.robot.check_arrival() or not self.robot.cg_inside(tolerance=1)
 
 
     

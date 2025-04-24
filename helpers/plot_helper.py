@@ -2,21 +2,20 @@ import matplotlib.pyplot as plt
 from IPython import display
 import numpy as np
 
-mean_scores = []
 plt.ion()
 fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 ax1, ax2 = axes
 fig.suptitle("Training...", fontsize=16, fontweight="bold")
-def plot(scores,last_scores,mse=None):
-    mean_scores.append(sum(last_scores)/len(last_scores))
+def plot(scores,last_scores,mean_scores,mse=None):
     display.clear_output(wait=True)
     ax1.clear()
     ax2.clear()
     ax1.set_title("Scores")
     ax1.set_xlabel("Number of games")
     ax1.set_ylabel("Score")
-    ax1.plot(scores)
-    ax1.plot(mean_scores)
+    ax1.plot(scores,alpha = 0.5, color = "grey")
+    ax1.plot(mean_scores, color=(50/255, 250/255, 3/255))
+    ax1.grid(True, which='both', linestyle='--', linewidth=1, alpha=0.7)
     if mse:
         ax2.plot(mse)
         ax2.text(len(mse)-1,mse[-1],f"{mse[-1]:.2f}")

@@ -67,7 +67,7 @@ class ActorNetwork(nn.Module):
     def forward(self, state):
         x = self.base(state)
         mu = self.mu_head(x)
-        std = torch.exp(self.log_std)  # garantir que std seja positivo
+        std = torch.exp(self.log_std)
         dist = Normal(mu, std)
         return dist
     
@@ -86,6 +86,7 @@ class CriticalNetwork(nn.Module):
         self.linear3 = nn.Linear(hidden_size2,hidden_size3)
         self.linear4 = nn.Linear(hidden_size3,output_size)
         self.optimizer = optim.Adam(self.parameters(),lr=lr)
+
         self.critic = nn.Sequential(
             self.linear1,
             nn.ReLU(),

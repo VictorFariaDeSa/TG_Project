@@ -3,9 +3,7 @@ import numpy as np
 from collections import deque
 import sys
 
-from torch import nn
 import torch
-import torch.optim as optim
 from stable_baselines3.common.env_checker import check_env
 
 upper_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -21,11 +19,12 @@ LAMBDA = 0.95
 NN_ACTOR_DIMENSIONS = [512,256,256]
 NN_CRITIC_DIMENSIONS = [512,256,128]
 POLICY_CLIP = 0.2
-LEARNING_RATE = 1e-5
+LEARNING_RATE_ACTOR = 1e-4
+LEARNING_RATE_CRITIC = 1e-4
 EPOCHS = 10
-BATCH_SIZE = 10
+BATCH_SIZE = 50
 MSE_CTE = 0.5
-ENTROPY_CTE = 0.5
+ENTROPY_CTE = 0.01
 
 SINGLE_NN = False
 NORMALIZE_DATA = False
@@ -42,6 +41,7 @@ class PPOMemory:
         self.maxs = np.zeros(input_size)
         self.mins = np.zeros(input_size)
         self.n_games = 0
+        self.load_registered_scores()
 
 
     def generate_batches(self):
@@ -82,11 +82,24 @@ class PPOMemory:
         self.plot_mean_scores.append(np.mean(self.last_scores))
 
     def plot(self):
-        plot(self.plot_scores, self.last_scores)
+        plot(self.plot_scores, self.last_scores, self.plot_mean_scores)
+    
+    def register_score(self):
+        np.savez('models/registered_scores.npz', plot_scores=self.plot_scores, last_scores=list(self.last_scores),plot_mean_scores = self.plot_mean_scores)
+
+
+    def load_registered_scores(self):
+        if os.path.exists("models/registered_scores.npz"):
+            dados = np.load('models/registered_scores.npz')
+            self.plot_scores = dados['plot_scores'].tolist()
+            self.last_scores = deque(dados['last_scores'].tolist(), maxlen=100)
+            self.plot_mean_scores = dados['plot_mean_scores'].tolist()
+        else:
+            print("No score data...")
 
 
 class Agent:
-    def __init__(self,env,gamma,lam,policy_clip,input_size,inner_dimensions_actor,inner_dimensions_critic,n_joints,lr,epochs,batch_size,c1,c2,single_nn,normalize_data,classic_returns):
+    def __init__(self,env,gamma,lam,policy_clip,input_size,inner_dimensions_actor,inner_dimensions_critic,n_joints,lr_actor,lr_critic,epochs,batch_size,c1,c2,single_nn,normalize_data,classic_returns):
         self.env = env
         self.gamma = gamma
         self.lam = lam
@@ -95,7 +108,8 @@ class Agent:
         self.inner_dimensions_actor = inner_dimensions_actor
         self.inner_dimensions_critic = inner_dimensions_critic
         self.n_joints = n_joints
-        self.lr = lr
+        self.lr_actor = lr_actor
+        self.lr_critic = lr_critic
         self.epochs = epochs
         self.batch_size = batch_size
         self.memory = PPOMemory(batch_size=batch_size,input_size=input_size)
@@ -108,13 +122,13 @@ class Agent:
                                   hidden_size2=inner_dimensions_actor[1],
                                   hidden_size3=inner_dimensions_actor[2],
                                   output_size = n_joints,
-                                  lr = lr,)
+                                  lr = lr_actor,)
         self.critic = CriticalNetwork(input_size= input_size,
                                       hidden_size1=inner_dimensions_critic[0],
                                       hidden_size2=inner_dimensions_critic[1],
                                       hidden_size3=inner_dimensions_critic[2],
                                       output_size=1,
-                                      lr=1e-4)
+                                      lr=lr_critic)
         self.c1 = c1
         self.c2 = c2
         self.single_nn = single_nn
@@ -310,6 +324,8 @@ class Agent:
             self.actor.save()
             self.critic.save()
 
+        self.memory.register_score()
+
     def load_model(self):
         if os.path.exists("models/critic_model.pth") and os.path.exists("models/actor_model.pth"):
             print("...Loading Model...")
@@ -337,7 +353,8 @@ if __name__ == "__main__":
         inner_dimensions_actor = NN_ACTOR_DIMENSIONS,
         inner_dimensions_critic = NN_CRITIC_DIMENSIONS,
         n_joints = env.action_space.shape[0],
-        lr = LEARNING_RATE,
+        lr_actor = LEARNING_RATE_ACTOR,
+        lr_critic = LEARNING_RATE_CRITIC,
         epochs = EPOCHS,
         batch_size = BATCH_SIZE,
         env = env,
