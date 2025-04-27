@@ -71,29 +71,36 @@ class Doggy_walker_env(gym.Env):
         laydown = self.robot.check_fall()
         reached = self.robot.check_arrival()
         [vx, vy, vz], [wx, wy, wz] = self.robot.get_velocities()
+        lazy_joints = (np.abs(self.robot.get_joints_angle_change()) < 0.05).all()
 
 
         height_goal = 0.35
 
         dx_bonus = +(dx) * 1000.0
-        height_bonus = +(z>0.25) * 5.0
+        height_bonus = +(z>0.25) * 1.0
         laydown_bonus = -(laydown) * 1000.0
         stable_bonus = (1 if stable else -1) * 1.0
         pitch_bonus = - (abs(pitch)) * 1.0
         progress_bonus = + (25-abs(x)) * 5
         speed_bonus = + (vx) * 5
         yaw_bonus = - (abs(yaw)) * 1 
+        stagnated_bonus = -(abs(vx)<0.1) * 3
+        lazy_joints_bonus = -1 if lazy_joints else 0
+
+
+
 
 
         reward = (
             dx_bonus
-            + height_bonus
+            # + height_bonus
             + laydown_bonus
-            + stable_bonus
-            + pitch_bonus
+            # + stable_bonus
+            # + pitch_bonus
             + progress_bonus
             + speed_bonus
-            + yaw_bonus
+            # + yaw_bonus
+            # + stagnated_bonus
         )
 
         return float(reward)

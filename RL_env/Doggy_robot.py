@@ -22,6 +22,7 @@ class Doggy_robot():
         self.target = self.sim.getObject(f'/{self.target_name}')
         self.fill_robot_data()
         self.last_x = self.sim.getObjectPosition(self.robot, self.target)[0]
+        self.last_joints_postion = self.get_joints_position()
 
 
     def fill_robot_data(self):
@@ -73,6 +74,29 @@ class Doggy_robot():
         for jointName in self.joint_list:
             joints_data.extend(self.get_joint_information(jointName))
         return joints_data
+    
+    def get_joints_speed(self):
+        speeds = []
+        for jointName in self.joint_list:
+            joint = self.handleDict[jointName]
+            _, speed = self.sim.getObjectFloatParameter(joint, self.sim.jointfloatparam_velocity)
+            speeds.append(speed)
+        return speeds
+    
+    def get_joints_position(self):
+        positions = []
+        for jointName in self.joint_list:
+            joint = self.handleDict[jointName]
+            angle = self.sim.getJointPosition(joint)
+            positions.append(angle)
+        return np.array(positions)
+    
+    def get_joints_angle_change(self):
+        new_pos = self.get_joints_position()
+        delta = new_pos - self.last_joints_postion
+        self.last_joints_postion = new_pos
+        return delta
+
 
 
     def check_stability(self,max_deg):
