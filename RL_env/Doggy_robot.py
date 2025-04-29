@@ -117,6 +117,10 @@ class Doggy_robot():
     def check_arrival(self):
         dx, _, _ = self.get_relative_position()
         return abs(dx) < 1.0
+    
+    def check_vel_0(self):
+        [vx, vy, vz], [wx, wy, wz] = self.get_velocities()
+        return vx < 0.1
 
 
     def cg_inside(self,tolerance=1):
