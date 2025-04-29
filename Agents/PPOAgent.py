@@ -24,11 +24,12 @@ LEARNING_RATE_CRITIC = 1e-4
 EPOCHS = 10
 BATCH_SIZE = 10
 MSE_CTE = 0.5
-ENTROPY_CTE = 0.5
+ENTROPY_CTE = 0.01
 
 SINGLE_NN = False
 NORMALIZE_DATA = False
 CLASSIC_RETURNS = True
+ADVANTAGE_NORMALIZATION = False
 
 
 class PPOMemory:
@@ -222,7 +223,8 @@ class Agent:
                 advantages_batch = torch.tensor(advantages[batch])
                 returns_batch = torch.tensor(returns[batch])
                 terminal_batch = torch.tensor(terminals[batch])
-                normalized_advantages = (advantages_batch - advantages_batch.mean()) / (advantages_batch.std() + 1e-8)
+                if ADVANTAGE_NORMALIZATION:
+                    advantages_batch = (advantages_batch - advantages_batch.mean()) / (advantages_batch.std() + 1e-8)
 
                 self.train_step_batch(states = states_batch,
                                       actions = actions_batch,
