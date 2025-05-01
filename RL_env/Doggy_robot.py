@@ -97,7 +97,11 @@ class Doggy_robot():
         self.last_joints_postion = new_pos
         return delta
 
-
+    def check_upside_down(self):
+        homo_matrix = self.get_cg()
+        if homo_matrix[2][2] < 0:
+            return True
+        return False
 
     def check_stability(self,max_deg):
         roll, pitch, yaw = self.get_orientation()

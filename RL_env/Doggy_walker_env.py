@@ -72,6 +72,7 @@ class Doggy_walker_env(gym.Env):
         reached = self.robot.check_arrival()
         [vx, vy, vz], [wx, wy, wz] = self.robot.get_velocities()
         cg_in = self.robot.cg_inside()
+        upside_down = self.robot.check_upside_down()
 
 
         height_goal = 0.35
@@ -94,6 +95,7 @@ class Doggy_walker_env(gym.Env):
         vel_0_bonus = (abs(vx)<0.1) * -1
         laydown_bonus = laydown*-1000
         cg_inside_bonus = cg_in * 1
+        upside_down_bonus = upside_down * -1000
         
 
 
@@ -110,7 +112,8 @@ class Doggy_walker_env(gym.Env):
             # + ang_speed_bonus
             + vel_0_bonus
             + laydown_bonus
-            +cg_inside_bonus
+            + cg_inside_bonus
+            + upside_down_bonus
         )
 
         return float(reward)
@@ -135,7 +138,7 @@ class Doggy_walker_env(gym.Env):
         return np.array(obs, dtype=np.float32)
 
     def check_done(self):
-        return self.robot.check_fall() or self.robot.check_arrival() #or not self.robot.cg_inside(tolerance=1)
+        return self.robot.check_fall() or self.robot.check_arrival() or self.robot.check_upside_down() #or not self.robot.cg_inside(tolerance=1)
 
 
     
