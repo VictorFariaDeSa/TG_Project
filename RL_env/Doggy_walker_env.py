@@ -87,10 +87,10 @@ class Doggy_walker_env(gym.Env):
         speed_bonus = vx*5
         reached_bonus = reached*10000
         correct_height_bonus = abs(z-height_goal)*-10
-        yaw_bonus = yaw * -0.5
-        pitch_bonus = pitch * -0.5
-        roll_bonus = roll*-0.5
-        y_offset_bonus = abs(y) * -1
+        yaw_bonus = yaw * -1
+        pitch_bonus = pitch * -1
+        roll_bonus = roll*-1
+        y_offset_bonus = abs(y) * -5
         ang_speed_bonus = abs(wx)+abs(wy)+abs(wz) * -1
         vel_0_bonus = (abs(vx)<0.1) * -1
         laydown_bonus = laydown*-1000
