@@ -125,6 +125,20 @@ class Doggy_robot():
     def check_vel_0(self):
         [vx, vy, vz], [wx, wy, wz] = self.get_velocities()
         return vx < 0.1
+    
+    def get_poligon_area(self):
+        points_dict = self.discover_base_polygon_points()
+        x1 = points_dict["FL"][0]
+        y1 = points_dict["FL"][1]
+        x2 = points_dict["FR"][0]
+        y2 = points_dict["FR"][1]
+        x3 = points_dict["RL"][0]
+        y3 = points_dict["RL"][1]
+        x4 = points_dict["RR"][0]
+        y4 = points_dict["RR"][1]
+        area = 1/2 * abs(x1*y2+x2*y3+x3*y4+x4*y1 - (y1*x2+y2*x3+y3*x4+y4*x1))
+        return area
+
 
 
     def cg_inside(self,tolerance=1):

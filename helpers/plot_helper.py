@@ -5,8 +5,8 @@ import numpy as np
 plt.ion()
 fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 ax1, ax2 = axes
-fig.suptitle("Training...", fontsize=16, fontweight="bold")
 def plot(scores,last_scores,mean_scores,mse=None):
+    fig.suptitle(f"Training... ep:{len(scores)}", fontsize=16, fontweight="bold")
     display.clear_output(wait=True)
     ax1.clear()
     ax2.clear()

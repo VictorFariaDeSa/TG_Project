@@ -17,7 +17,7 @@ class Doggy_walker_env(gym.Env):
     def __init__(self):
         super().__init__()
         self.action_space = spaces.Box(low=LOW_ACTION, high=HIGH_ACTION, shape=(8,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(31,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(28,), dtype=np.float32)
 
         self.sim = create_stepped_sim()
         
@@ -87,11 +87,11 @@ class Doggy_walker_env(gym.Env):
         speed_bonus = vx*5
         reached_bonus = reached*10000
         correct_height_bonus = abs(z-height_goal)*-10
-        yaw_bonus = yaw * -0.5
-        pitch_bonus = pitch * -0.5
-        roll_bonus = roll*-0.5
+        yaw_bonus = abs(yaw) * -1
+        pitch_bonus = abs(pitch) * -1
+        roll_bonus = abs(roll)*-1
         y_offset_bonus = abs(y) * -1
-        ang_speed_bonus = abs(wx)+abs(wy)+abs(wz) * -1
+        ang_speed_bonus = (abs(wx)+abs(wy)+abs(wz)) * -1
         vel_0_bonus = (abs(vx)<0.1) * -1
         laydown_bonus = laydown*-1000
         cg_inside_bonus = cg_in * 1
@@ -129,7 +129,6 @@ class Doggy_walker_env(gym.Env):
         obs.extend([x, y, z])
         obs.extend([roll,pitch,yaw])
         obs.extend([vx, vy, vz, wx, wy, wz])
-        obs.extend([vx,vy,vz])
         obs.extend(joints_data)
         matrix = self.robot.get_matrix()
         # obs.append(matrix[0])
