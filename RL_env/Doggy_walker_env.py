@@ -77,6 +77,8 @@ class Doggy_walker_env(gym.Env):
         poligon_area = self.robot.get_poligon_area()
         height_goal = 0.35
         height_range = abs(height_goal-z) < 0.1
+        maxed_joints = self.robot.get_joints_on_max()
+        n_maxed_joints = sum(maxed_joints)
 
 
         
@@ -88,6 +90,7 @@ class Doggy_walker_env(gym.Env):
         progress_bonus = + (25-abs(x)) * 5
 
         speed_bonus = vx*5
+        vy_bonus = abs(vy)*-5
         reached_bonus = reached*10000
         correct_height_bonus = abs(z-height_goal)*-10
         yaw_bonus = abs(yaw) * -2
@@ -101,6 +104,7 @@ class Doggy_walker_env(gym.Env):
         upside_down_bonus = upside_down * -1000
         area_bonus = 0 if poligon_area > 0.2 else -10
         height_range_bonus = height_range*1
+        # maxed_joints_bonus = n_maxed_joints * -1
 
         
 
@@ -122,6 +126,8 @@ class Doggy_walker_env(gym.Env):
             + upside_down_bonus
             + area_bonus
             +height_range_bonus
+            +vy_bonus
+            # +maxed_joints_bonus
         )
 
         return float(reward)

@@ -69,6 +69,25 @@ class Doggy_robot():
         _, speed = self.sim.getObjectFloatParameter(joint, self.sim.jointfloatparam_velocity)
         return [angle,speed]
     
+    def get_joints_on_max(self):
+        joints_data = []
+        for jointName in self.joint_list:
+            angle,speed = self.get_joint_information(jointName)
+            if "upper" in jointName:
+                if angle < -1.5 or angle > 1.5:
+                    joints_data.append(1)
+                else:
+                    joints_data.append(0)
+            elif "lower" in jointName:
+                if angle > -0.1 or angle < -2.3:
+                    joints_data.append(1)
+                else:
+                    joints_data.append(0)
+            else:
+                raise ValueError("Não foram observadas todas as juntas")
+        return joints_data
+
+
     def get_all_joints_information(self):
         joints_data = []
         for jointName in self.joint_list:
