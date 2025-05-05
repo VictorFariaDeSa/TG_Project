@@ -73,6 +73,7 @@ class Doggy_walker_env(gym.Env):
         [vx, vy, vz], [wx, wy, wz] = self.robot.get_velocities()
         cg_in = self.robot.cg_inside()
         upside_down = self.robot.check_upside_down()
+        poligon_area = self.robot.get_poligon_area()
 
 
         height_goal = 0.35
@@ -96,6 +97,8 @@ class Doggy_walker_env(gym.Env):
         laydown_bonus = laydown*-1000
         cg_inside_bonus = cg_in * 1
         upside_down_bonus = upside_down * -1000
+        area_bonus = 0 if poligon_area > 0.2 else -10
+
         
 
 
@@ -114,6 +117,7 @@ class Doggy_walker_env(gym.Env):
             + laydown_bonus
             + cg_inside_bonus
             + upside_down_bonus
+            + area_bonus
         )
 
         return float(reward)
