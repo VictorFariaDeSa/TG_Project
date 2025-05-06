@@ -86,25 +86,21 @@ class Doggy_walker_env(gym.Env):
         dx_bonus = +(dx) * 5000.0
         laydown_bonus = -(laydown) * 1000.0
         stable_bonus = (1 if stable else -1) * 1.0
-        pitch_bonus = - (abs(pitch)) * 1.0
-        progress_bonus = + (25-abs(x)) * 5
 
         speed_bonus = vx*5
         vy_bonus = abs(vy)*-5
         reached_bonus = reached*10000
-        correct_height_bonus = abs(z-height_goal)*-10
         yaw_bonus = abs(yaw) * -2
         pitch_bonus = abs(pitch) * -1
         roll_bonus = abs(roll)*-1
         y_offset_bonus = abs(y) * -1
-        ang_speed_bonus = (abs(wx)+abs(wy)+abs(wz)) * -1
         vel_0_bonus = (abs(vx)<0.1) * -1
         laydown_bonus = laydown*-1000
         cg_inside_bonus = cg_in * 1
         upside_down_bonus = upside_down * -1000
         area_bonus = 0 if poligon_area > 0.2 else -10
         height_range_bonus = height_range*1
-        # maxed_joints_bonus = n_maxed_joints * -1
+        maxed_joints_bonus = n_maxed_joints * -1
 
         
 
@@ -114,12 +110,10 @@ class Doggy_walker_env(gym.Env):
             dx_bonus
             + speed_bonus
             + reached_bonus
-            # + correct_height_bonus
             + yaw_bonus
             + pitch_bonus
             + roll_bonus
             + y_offset_bonus
-            # + ang_speed_bonus
             + vel_0_bonus
             + laydown_bonus
             + cg_inside_bonus
@@ -127,7 +121,7 @@ class Doggy_walker_env(gym.Env):
             + area_bonus
             +height_range_bonus
             +vy_bonus
-            # +maxed_joints_bonus
+            +maxed_joints_bonus
         )
 
         return float(reward)

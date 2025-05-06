@@ -69,6 +69,12 @@ class Doggy_robot():
         _, speed = self.sim.getObjectFloatParameter(joint, self.sim.jointfloatparam_velocity)
         return [angle,speed]
     
+
+    def get_joints_speed_0(self):
+        speeds = self.get_joints_speed()
+        check_zero_speed = [0 if speed > 0.2 else 1 for speed in speeds]
+        return check_zero_speed
+
     def get_joints_on_max(self):
         joints_data = []
         for jointName in self.joint_list:
