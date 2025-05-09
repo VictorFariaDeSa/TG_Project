@@ -11,12 +11,26 @@ MAX_STEPS = 1000
 HIGH_ACTION = 3
 LOW_ACTION = -3
 
+
+
+LOW_LOWER = -math.pi*3/4
+HIGH_LOWER = 0
+LOW_UPPER = -math.pi/2
+HIGH_UPPER = math.pi/2
+
+
+
+
+
+
 class Doggy_walker_env(gym.Env):
     metadata = {"render_modes": [], "render_fps": 60}
 
     def __init__(self):
         super().__init__()
-        self.action_space = spaces.Box(low=LOW_ACTION, high=HIGH_ACTION, shape=(8,), dtype=np.float32)
+        low = np.array([LOW_UPPER]*4 + [LOW_LOWER]*4, dtype=np.float32)
+        high = np.array([HIGH_UPPER]*4 + [HIGH_LOWER]*4, dtype=np.float32)
+        self.action_space = spaces.Box(low=low, high=high, dtype=np.float32)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(28,), dtype=np.float32)
 
         self.sim = create_stepped_sim()
@@ -31,12 +45,12 @@ class Doggy_walker_env(gym.Env):
 
         
     def step(self, action):
-        action = np.clip(action,LOW_ACTION,HIGH_ACTION)
-        self.robot.input_speed_actions(action)
+        clipped_action = np.clip(action, self.action_space.low, self.action_space.high)
+        self.robot.input_position_actions(clipped_action)
         self.sim.step()
         self.n_steps += 1
         obs = self.get_observation()
-        reward = self.get_reward(action)
+        reward = self.get_reward(clipped_action)
         done = self.check_done()
         truncated = self.n_steps >= MAX_STEPS
 

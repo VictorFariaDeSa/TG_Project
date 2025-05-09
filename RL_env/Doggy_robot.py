@@ -7,10 +7,10 @@ class Doggy_robot():
         self.name = robot_name
         self.target_name = target_name
         self.joint_list = [
-            "RR_upper_leg_joint", "RL_upper_leg_joint",
-            "FR_upper_leg_joint", "FL_upper_leg_joint",
-            "RR_lower_leg_joint", "RL_lower_leg_joint",
-            "FR_lower_leg_joint", "FL_lower_leg_joint"
+            "RR_upper_leg_joint", "FL_upper_leg_joint",
+            "FR_upper_leg_joint", "RL_upper_leg_joint",
+            "RR_lower_leg_joint", "FL_lower_leg_joint",
+            "FR_lower_leg_joint", "RL_lower_leg_joint", 
         ]
         self.links_list = ["base_link_visual",
             "RR_upper_leg_link_visual","RR_lower_leg_link_visual","RR_foot_link_visual",
@@ -53,7 +53,13 @@ class Doggy_robot():
     def input_speed_actions(self,actions):
         for i, jointName in enumerate(self.joint_list):
             joint = self.handleDict[jointName]
-            self.sim.setJointTargetVelocity(joint, float(actions[i]))
+            action_idx = i // 2
+            self.sim.setJointTargetVelocity(joint, float(actions[action_idx]))
+
+    def input_position_actions(self,actions):
+        for i, jointName in enumerate(self.joint_list):
+            joint = self.handleDict[jointName]
+            self.sim.setJointTargetPosition(joint, float(actions[i]))
 
     def get_relative_position(self):
         return self.sim.getObjectPosition(self.robot, self.target)
