@@ -79,12 +79,16 @@ class Doggy_robot():
 
     def get_joints_orientation_change(self):
         new_orientation = self.get_joints_orientation()
+        print(new_orientation)
+        print(self.last_joints_orientation)
         n_changes = np.sum(new_orientation != self.last_joints_orientation)
+        print(n_changes)
+        print("-"*40)
         self.last_joints_orientation = new_orientation
         return n_changes
 
     def get_joints_orientation(self):
-        speeds = self.get_joints_speed()
+        speeds = np.array(self.get_joints_speed())
         orientation = np.where(speeds > 0, 1, np.where(speeds < 0, -1, 0))
         return orientation
 

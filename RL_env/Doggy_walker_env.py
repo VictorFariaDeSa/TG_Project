@@ -85,6 +85,7 @@ class Doggy_walker_env(gym.Env):
         laydown = self.robot.check_fall()
         reached = self.robot.check_arrival()
         [vx, vy, vz], [wx, wy, wz] = self.robot.get_velocities()
+        n_changes_joints_orientation = self.robot.get_joints_orientation_change()
         
         cg_in = self.robot.cg_inside()
         upside_down = self.robot.check_upside_down()
@@ -115,6 +116,7 @@ class Doggy_walker_env(gym.Env):
         area_bonus = 0 if poligon_area > 0.2 else -10
         height_range_bonus = height_range*1
         maxed_joints_bonus = n_maxed_joints * -1
+        n_changes_joints_orientation_bonus = n_changes_joints_orientation * -1
 
         
 
@@ -136,6 +138,7 @@ class Doggy_walker_env(gym.Env):
             +height_range_bonus
             +vy_bonus
             +maxed_joints_bonus
+            +n_changes_joints_orientation
         )
 
         return float(reward)
