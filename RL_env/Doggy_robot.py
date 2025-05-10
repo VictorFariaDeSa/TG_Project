@@ -23,6 +23,7 @@ class Doggy_robot():
         self.fill_robot_data()
         self.last_x = self.sim.getObjectPosition(self.robot, self.target)[0]
         self.last_joints_postion = self.get_joints_position()
+        self.last_joints_orientation = self.get_joints_orientation()
 
 
     def fill_robot_data(self):
@@ -75,6 +76,17 @@ class Doggy_robot():
         _, speed = self.sim.getObjectFloatParameter(joint, self.sim.jointfloatparam_velocity)
         return [angle,speed]
     
+
+    def get_joints_orientation_change(self):
+        new_orientation = self.get_joints_orientation()
+        n_changes = np.sum(new_orientation != self.last_joints_orientation)
+        self.last_joints_orientation = new_orientation
+        return n_changes
+
+    def get_joints_orientation(self):
+        speeds = self.get_joints_speed()
+        orientation = np.where(speeds > 0, 1, np.where(speeds < 0, -1, 0))
+        return orientation
 
     def get_joints_speed_0(self):
         speeds = self.get_joints_speed()
