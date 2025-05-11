@@ -30,7 +30,7 @@ class Doggy_walker_env(gym.Env):
         super().__init__()
         low = np.array([LOW_UPPER]*4 + [LOW_LOWER]*4, dtype=np.float32)
         high = np.array([HIGH_UPPER]*4 + [HIGH_LOWER]*4, dtype=np.float32)
-        self.action_space = spaces.Box(low=low, high=high, dtype=np.float32)
+        self.action_space = spaces.Box(low=low, high=high,shape=(8,), dtype=np.float32)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(28,), dtype=np.float32)
 
         self.sim = create_stepped_sim()
@@ -86,7 +86,6 @@ class Doggy_walker_env(gym.Env):
         reached = self.robot.check_arrival()
         [vx, vy, vz], [wx, wy, wz] = self.robot.get_velocities()
         n_changes_joints_orientation = self.robot.get_joints_orientation_change()
-        
         cg_in = self.robot.cg_inside()
         upside_down = self.robot.check_upside_down()
         poligon_area = self.robot.get_poligon_area()
@@ -96,27 +95,28 @@ class Doggy_walker_env(gym.Env):
         n_maxed_joints = sum(maxed_joints)
 
 
-        
-
-        dx_bonus = +(dx) * 5000.0
-        laydown_bonus = -(laydown) * 1000.0
-        stable_bonus = (1 if stable else -1) * 1.0
-
-        speed_bonus = vx*5
-        vy_bonus = abs(vy)*-5
+        dx_bonus = +(dx) * 50.0
+        speed_bonus = vx*1
         reached_bonus = reached*10000
-        yaw_bonus = abs(yaw) * -0.5
-        pitch_bonus = abs(pitch) * -10
-        roll_bonus = abs(roll)*-10
-        y_offset_bonus = abs(y) * -10
-        vel_0_bonus = (abs(vx)<0.1) * -1
-        laydown_bonus = laydown*-1000
         cg_inside_bonus = cg_in * 1
-        upside_down_bonus = upside_down * -1000
-        area_bonus = 0 if poligon_area > 0.2 else -10
         height_range_bonus = height_range*1
-        maxed_joints_bonus = n_maxed_joints * -1
-        n_changes_joints_orientation_bonus = n_changes_joints_orientation * -1
+        correct_direction_bonus = (abs(yaw) < 1.5) * 1
+        area_bonus = 1 if poligon_area > 0.2 else 0
+
+
+
+        vy_bonus = abs(vy)*-0.5
+        vz_bonus = abs(vz)*-0.5
+        pitch_bonus = abs(pitch) * -0.5
+        roll_bonus = abs(roll)*-0.5
+        y_offset_bonus = abs(y) * -1
+        vel_0_bonus = (abs(vx)<0.1) * -0.5
+        maxed_joints_bonus = n_maxed_joints * -0.5
+        n_changes_joints_orientation_bonus = n_changes_joints_orientation * -0.1
+
+
+        laydown_bonus = (laydown) * -100.0
+        upside_down_bonus = upside_down * -100
 
         
 
@@ -126,7 +126,7 @@ class Doggy_walker_env(gym.Env):
             dx_bonus
             + speed_bonus
             + reached_bonus
-            + yaw_bonus
+            + correct_direction_bonus
             + pitch_bonus
             + roll_bonus
             + y_offset_bonus
@@ -137,8 +137,9 @@ class Doggy_walker_env(gym.Env):
             + area_bonus
             +height_range_bonus
             +vy_bonus
+            +vz_bonus
             +maxed_joints_bonus
-            +n_changes_joints_orientation
+            +n_changes_joints_orientation_bonus
         )
 
         return float(reward)
