@@ -86,6 +86,7 @@ class Doggy_walker_env(gym.Env):
         reached = self.robot.check_arrival()
         [vx, vy, vz], [wx, wy, wz] = self.robot.get_velocities()
         n_changes_joints_orientation = self.robot.get_joints_orientation_change()
+        zero_speed_joints = sum(self.robot.get_joints_speed_0())
         cg_in = self.robot.cg_inside()
         upside_down = self.robot.check_upside_down()
         poligon_area = self.robot.get_poligon_area()
@@ -95,7 +96,7 @@ class Doggy_walker_env(gym.Env):
         n_maxed_joints = sum(maxed_joints)
 
 
-        dx_bonus = +(dx) * 50.0
+        dx_bonus = +(dx) * 500.0
         speed_bonus = vx*1
         reached_bonus = reached*10000
         cg_inside_bonus = cg_in * 1
@@ -109,10 +110,11 @@ class Doggy_walker_env(gym.Env):
         vz_bonus = abs(vz)*-0.5
         pitch_bonus = abs(pitch) * -0.5
         roll_bonus = abs(roll)*-0.5
-        y_offset_bonus = abs(y) * -1
+        y_offset_bonus = abs(y) * -5
         vel_0_bonus = (abs(vx)<0.1) * -0.5
         maxed_joints_bonus = n_maxed_joints * -0.5
         n_changes_joints_orientation_bonus = n_changes_joints_orientation * -0.1
+        zero_speed_joints_bonus = zero_speed_joints * -0.1
 
 
         laydown_bonus = (laydown) * -100.0
@@ -140,6 +142,8 @@ class Doggy_walker_env(gym.Env):
             +vz_bonus
             +maxed_joints_bonus
             +n_changes_joints_orientation_bonus
+            +zero_speed_joints_bonus
+
         )
 
         return float(reward)

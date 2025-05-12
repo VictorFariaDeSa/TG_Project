@@ -62,6 +62,16 @@ class Doggy_robot():
             joint = self.handleDict[jointName]
             self.sim.setJointTargetPosition(joint, float(actions[i]))
 
+
+
+    def get_x_pos(self):
+        x,y,z = self.get_relative_position()
+        return x
+
+    def get_y_pos(self):
+        x,y,z = self.get_relative_position()
+        return y
+
     def get_relative_position(self):
         return self.sim.getObjectPosition(self.robot, self.target)
     def get_orientation(self):

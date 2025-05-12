@@ -1,8 +1,6 @@
 import os
 import numpy as np
-from collections import deque
 import sys
-
 import torch
 from stable_baselines3.common.env_checker import check_env
 
@@ -10,7 +8,8 @@ upper_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, upper_folder)
 from Neural_Nets import PPO_NN,ActorNetwork,CriticalNetwork
 from RL_env.Doggy_walker_env import Doggy_walker_env
-from helpers.plot_helper import plot
+from PPOMemory import PPOMemory
+
 
 
 
@@ -30,73 +29,6 @@ SINGLE_NN = False
 NORMALIZE_DATA = False
 CLASSIC_RETURNS = False
 ADVANTAGE_NORMALIZATION = True
-
-
-class PPOMemory:
-    def __init__(self,batch_size,input_size):
-        self.batch_size = batch_size
-        self.last_scores = deque(maxlen=100)
-        self.plot_scores = []
-        self.plot_mean_scores = []
-        self.clear_memory()
-        self.maxs = np.zeros(input_size)
-        self.mins = np.zeros(input_size)
-        self.n_games = 0
-        self.load_registered_scores()
-
-
-    def generate_batches(self):
-        n_states = len(self.buffer_states)
-        batch_start = np.arange(0,n_states,self.batch_size)
-        indices = np.arange(n_states)
-        np.random.shuffle(indices)
-        batches = [indices[i:i+self.batch_size] for i in batch_start]
-        return np.array(self.buffer_states),np.array(self.buffer_actions),\
-    np.array(self.buffer_rewards),np.array(self.buffer_is_terminal),np.array(self.buffer_next_states),\
-    np.array(self.buffer_probs),np.array(self.buffer_state_values),np.array(self.buffer_advantages),\
-    np.array(self.buffer_returns),batches
-
-    def remember(self,state,actions,reward,next_state,done,log_probs,state_value):
-        self.buffer_states.append(state)
-        self.buffer_actions.append(actions)
-        self.buffer_rewards.append(reward)
-        self.buffer_is_terminal.append(done)
-        self.buffer_next_states.append(next_state)
-
-        self.buffer_probs.append(log_probs)
-        self.buffer_state_values.append(state_value)
-
-    def clear_memory(self):
-        self.buffer_advantages = []
-        self.buffer_states = []
-        self.buffer_actions = []
-        self.buffer_probs = []
-        self.buffer_state_values = []
-        self.buffer_rewards = []
-        self.buffer_is_terminal = []
-        self.buffer_next_states = []
-        self.buffer_returns = []
-
-    def save_score(self,score):
-        self.plot_scores.append(score)
-        self.last_scores.append(score)
-        self.plot_mean_scores.append(np.mean(self.last_scores))
-
-    def plot(self):
-        plot(self.plot_scores, self.last_scores, self.plot_mean_scores)
-    
-    def register_score(self):
-        np.savez('models/registered_scores.npz', plot_scores=self.plot_scores, last_scores=list(self.last_scores),plot_mean_scores = self.plot_mean_scores)
-
-
-    def load_registered_scores(self):
-        if os.path.exists("models/registered_scores.npz"):
-            dados = np.load('models/registered_scores.npz')
-            self.plot_scores = dados['plot_scores'].tolist()
-            self.last_scores = deque(dados['last_scores'].tolist(), maxlen=100)
-            self.plot_mean_scores = dados['plot_mean_scores'].tolist()
-        else:
-            print("No score data...")
 
 
 class Agent:
@@ -142,6 +74,9 @@ class Agent:
         self.action_high = torch.tensor(env.action_space.high, dtype=torch.float32)
         self.load_model()
         self.best_score = float("-inf")
+        model_folder_path = "./models"
+        if not os.path.exists(model_folder_path):
+            os.makedirs(model_folder_path)
 
 
     def train_step(self):
@@ -168,6 +103,14 @@ class Agent:
             log_probs = log_prob.detach().numpy()
         )
         self.last_observation = new_observation
+        self.memory.remember_all(
+            positions=self.env.robot.get_relative_position(),
+            speeds=self.env.robot.get_velocities()[0],
+            rpy = self.env.robot.get_orientation(),
+            poligon_area=self.env.robot.get_poligon_area(),
+            cg_inside=self.env.robot.cg_inside(),
+            relative_yaw_angle=0)
+
         if terminated or truncated:
             self.memory.n_games += 1
             if not terminated:
@@ -178,6 +121,8 @@ class Agent:
 
             else:
                 next_value = torch.tensor([0.], dtype=torch.float)
+            
+            self.memory.save_h5_all()   
             self.learn(next_value = next_value)
             self.last_observation, info = self.env.reset()
 
@@ -325,8 +270,6 @@ class Agent:
         else:
             self.actor.save()
             self.critic.save()
-
-        self.memory.register_score()
 
     def load_model(self):
         if os.path.exists("models/critic_model.pth") and os.path.exists("models/actor_model.pth"):
