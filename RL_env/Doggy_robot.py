@@ -303,3 +303,13 @@ class Doggy_robot():
 
         return inverse_rotation_matrix @ homo_matrix
 
+
+
+
+    def get_correct_direction_angle(self):
+        x,y,z = self.get_relative_position()
+        roll, pitch,yaw = self.get_orientation()
+        loss_angle = math.atan2(-y, -x)
+        delta = loss_angle - yaw
+        delta = (delta + math.pi) % (2 * math.pi) - math.pi
+        return delta

@@ -94,14 +94,14 @@ class Doggy_walker_env(gym.Env):
         height_range = abs(height_goal-z) < 0.1
         maxed_joints = self.robot.get_joints_on_max()
         n_maxed_joints = sum(maxed_joints)
-
+        loss_angle = self.robot.get_correct_direction_angle()
 
         dx_bonus = +(dx) * 500.0
-        speed_bonus = vx*1
+        speed_bonus = vx*5
         reached_bonus = reached*10000
-        cg_inside_bonus = cg_in * 1
+        cg_inside_bonus = cg_in * 5
         height_range_bonus = height_range*1
-        correct_direction_bonus = (abs(yaw) < 1.5) * 1
+        correct_direction_bonus = 5 if abs(loss_angle) < math.pi/9 else abs(loss_angle) * -1
         area_bonus = 1 if poligon_area > 0.2 else 0
 
 

@@ -109,7 +109,8 @@ class Agent:
             rpy = self.env.robot.get_orientation(),
             poligon_area=self.env.robot.get_poligon_area(),
             cg_inside=self.env.robot.cg_inside(),
-            relative_yaw_angle=0)
+            relative_yaw_angle=self.env.robot.get_correct_direction_angle(),
+            reward = reward)
 
         if terminated or truncated:
             self.memory.n_games += 1
@@ -270,6 +271,7 @@ class Agent:
         else:
             self.actor.save()
             self.critic.save()
+        self.memory.register_score()
 
     def load_model(self):
         if os.path.exists("models/critic_model.pth") and os.path.exists("models/actor_model.pth"):

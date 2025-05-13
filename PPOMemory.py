@@ -44,15 +44,17 @@ class PPOMemory:
         self.poligon_area_buffer = []
         self.cg_inside_buffer = []
         self.relative_yaw_angle_buffer = []
+        self.rewards_buffer = []
 
 
-    def remember_all(self,positions,speeds,rpy,poligon_area,cg_inside,relative_yaw_angle):
+    def remember_all(self,positions,speeds,rpy,poligon_area,cg_inside,relative_yaw_angle,reward):
         self.remember_positions(postions=positions)
         self.remember_speeds(speeds=speeds)
         self.remember_RPY(rpy=rpy)
         self.remember_misc(poligon_area=poligon_area,
                            cg_inside=cg_inside,
-                           relative_yaw_angle=relative_yaw_angle)
+                           relative_yaw_angle=relative_yaw_angle,
+                           reward = reward)
 
     def remember_positions(self,postions):
         x,y,z = postions
@@ -72,10 +74,12 @@ class PPOMemory:
         self.pitch_buffer.append(pitch)
         self.yaw_buffer.append(yaw)
 
-    def remember_misc(self,poligon_area,cg_inside,relative_yaw_angle):
+    def remember_misc(self,poligon_area,cg_inside,relative_yaw_angle,reward):
         self.poligon_area_buffer.append(poligon_area)
         self.cg_inside_buffer.append(cg_inside)
         self.relative_yaw_angle_buffer.append(relative_yaw_angle)
+        self.rewards_buffer.append(reward)
+
 
 
     def save_h5_all(self):
@@ -134,15 +138,21 @@ class PPOMemory:
             poligon_area_name = f'x_{self.n_games}'
             cg_inside_name = f'y_{self.n_games}'
             relative_angle_name = f'z_{self.n_games}'
+            reward_name = f'reward_{self.n_games}'
+
             if poligon_area_name in f:
                 del f[poligon_area_name]
             if cg_inside_name in f:
                 del f[cg_inside_name]
             if relative_angle_name in f:
                 del f[relative_angle_name]
+            if reward_name in f:
+                del f[reward_name]
             f.create_dataset(poligon_area_name, data=self.poligon_area_buffer)
             f.create_dataset(cg_inside_name, data=self.cg_inside_buffer)
             f.create_dataset(relative_angle_name, data=self.relative_yaw_angle_buffer)
+            f.create_dataset(reward_name, data=self.rewards_buffer)
+
     
 
     def generate_batches(self):
@@ -188,6 +198,9 @@ class PPOMemory:
     def plot(self):
         plot(self.plot_scores, self.last_scores, self.plot_mean_scores)
 
+
+    def register_score(self):
+        np.savez('models/registered_scores.npz', plot_scores=self.plot_scores, last_scores=list(self.last_scores),plot_mean_scores = self.plot_mean_scores)
 
     def load_registered_scores(self):
         if os.path.exists("models/registered_scores.npz"):
