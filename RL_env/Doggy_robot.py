@@ -24,7 +24,26 @@ class Doggy_robot():
         self.last_x = self.sim.getObjectPosition(self.robot, self.target)[0]
         self.last_joints_postion = self.get_joints_position()
         self.last_joints_orientation = self.get_joints_orientation()
+        self.last_time = self.sim.getSimulationTime()
+        self.last_joints_speed = self.get_joints_speed()
 
+
+
+
+    def get_joints_acceleration(self):
+        joints_speed = self.get_joints_speed()
+        delta_speeds = np.array(joints_speed)-np.array(self.last_joints_speed)
+        curr_time = self.sim.getSimulationTime()
+        delta_time = curr_time - self.last_time
+        accel = delta_speeds/delta_time
+
+        self.last_time = curr_time
+        self.last_joints_speed = joints_speed
+
+
+
+
+        return accel
 
     def fill_robot_data(self):
         handleDict = {}

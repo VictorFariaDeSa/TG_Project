@@ -56,7 +56,15 @@ class Doggy_walker_env(gym.Env):
 
         self.score += reward
         info = {}
-
+        if truncated:
+            info["end_cause"] = "truncated"
+        if done:
+            if self.robot.check_fall():
+                info["end_cause"] = "fall"
+            elif self.robot.check_upside_down():
+                info["end_cause"] = "upside_down"
+            elif self.robot.check_arrival():
+                info["end_cause"] = "arrival"
         return obs, reward, done, truncated, info
 
     def reset(self, seed=None, options=None):
@@ -69,6 +77,7 @@ class Doggy_walker_env(gym.Env):
 
         self.robot.last_x = self.robot.get_relative_position()[0]
         self.last_time = self.sim.getSimulationTime()
+        self.robot.last_time = self.sim.getSimulationTime()
 
         obs = self.get_observation()
         info = info_dict
@@ -95,13 +104,14 @@ class Doggy_walker_env(gym.Env):
         maxed_joints = self.robot.get_joints_on_max()
         n_maxed_joints = sum(maxed_joints)
         loss_angle = self.robot.get_correct_direction_angle()
+        joints_accel = np.abs(self.robot.get_joints_acceleration())
 
-        dx_bonus = +(dx) * 500.0
+        dx_bonus = +(dx) * 750.0
         speed_bonus = vx*5
         reached_bonus = reached*10000
         cg_inside_bonus = cg_in * 5
-        height_range_bonus = height_range*1
-        correct_direction_bonus = 5 if abs(loss_angle) < math.pi/9 else abs(loss_angle) * -1
+        height_range_bonus = height_range*5
+        correct_direction_bonus = 10 if abs(loss_angle) < math.pi/9 else abs(loss_angle) * -1   
         area_bonus = 1 if poligon_area > 0.2 else 0
 
 
@@ -115,10 +125,10 @@ class Doggy_walker_env(gym.Env):
         maxed_joints_bonus = n_maxed_joints * -0.5
         n_changes_joints_orientation_bonus = n_changes_joints_orientation * -0.1
         zero_speed_joints_bonus = zero_speed_joints * -0.1
+        joints_accel_bonus = np.sum(joints_accel) * -0.01
 
-
-        laydown_bonus = (laydown) * -100.0
-        upside_down_bonus = upside_down * -100
+        laydown_bonus = (laydown) * -1000.0
+        upside_down_bonus = upside_down * -1000
 
         
 
@@ -143,6 +153,7 @@ class Doggy_walker_env(gym.Env):
             +maxed_joints_bonus
             +n_changes_joints_orientation_bonus
             +zero_speed_joints_bonus
+            +joints_accel_bonus
 
         )
 

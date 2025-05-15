@@ -123,9 +123,11 @@ class Agent:
             else:
                 next_value = torch.tensor([0.], dtype=torch.float)
             
-            self.memory.save_h5_all()   
-            self.learn(next_value = next_value)
+            self.memory.save_h5_all()
+            self.memory.save_end_cause(info)
+            mean_mse,mean_loss = self.learn(next_value = next_value)
             self.last_observation, info = self.env.reset()
+            self.memory.save_losses(mean_loss,mean_mse)
 
             self.memory.save_score(info["score"])
             self.memory.plot()
@@ -148,6 +150,8 @@ class Agent:
 
 
     def learn(self,next_value = None):
+        loss_function_list = []
+        mse_loss_list = []
         if self.classic_returns:
             self.memory.buffer_advantages,_ = self.calculate_GAE(next_value = None)
             self.memory.buffer_returns = self.calculate_returns_old_fashion(self.memory.buffer_rewards)
@@ -172,7 +176,7 @@ class Agent:
                 if ADVANTAGE_NORMALIZATION:
                     advantages_batch = (advantages_batch - advantages_batch.mean()) / (advantages_batch.std() + 1e-8)
 
-                self.train_step_batch(states = states_batch,
+                mse_loss,loss_function = self.train_step_batch(states = states_batch,
                                       actions = actions_batch,
                                       rewards = rewards_batch,
                                       next_states = next_states_batch,
@@ -184,8 +188,11 @@ class Agent:
                                       c1 = self.c1,
                                       c2 = self.c2
                                       )
+                mse_loss_list.append(mse_loss)
+                loss_function_list.append(loss_function)
 
         self.memory.clear_memory()
+        return np.mean(mse_loss_list),np.mean(loss_function_list)
 
     def train_step_batch(self,states,actions,rewards,next_states,terminals,returns,old_probs,state_values,advantages,c1,c2):
         if self.single_nn:
@@ -223,6 +230,8 @@ class Agent:
             self.critic.optimizer.zero_grad()
             mse_loss.backward()
             self.critic.optimizer.step()
+        
+        return mse_loss, loss_function
 
         
 

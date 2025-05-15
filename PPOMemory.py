@@ -88,6 +88,27 @@ class PPOMemory:
         self.save_h5_RPY()
         self.save_h5_misc()
 
+
+
+    def save_losses(self,mean_loss,mean_mse):
+        with h5py.File('models/Positions.h5', 'a') as f:
+            loss_name = f'loss_{self.n_games}'
+            mse_name = f'mse_{self.n_games}'
+            if loss_name in f:
+                del f[loss_name]
+            if mse_name in f:
+                del f[mse_name]
+            f.create_dataset(loss_name, data=mean_loss)
+            f.create_dataset(mse_name, data=mean_mse)
+
+    def save_end_cause(self,info):
+        with h5py.File('models/Positions.h5', 'a') as f:
+            info_name = f'info_{self.n_games}'
+            if info_name in f:
+                del f[info_name]
+            f.create_dataset(info_name, data=info)
+
+
     def save_h5_positions(self):
         with h5py.File('models/Positions.h5', 'a') as f:
             x_name = f'x_{self.n_games}'
