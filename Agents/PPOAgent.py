@@ -124,7 +124,7 @@ class Agent:
                 next_value = torch.tensor([0.], dtype=torch.float)
             
             self.memory.save_h5_all()
-            self.memory.save_end_cause(info)
+            self.memory.save_end_cause(info["end_cause"])
             mean_mse,mean_loss = self.learn(next_value = next_value)
             self.last_observation, info = self.env.reset()
             self.memory.save_losses(mean_loss,mean_mse)
@@ -188,8 +188,8 @@ class Agent:
                                       c1 = self.c1,
                                       c2 = self.c2
                                       )
-                mse_loss_list.append(mse_loss)
-                loss_function_list.append(loss_function)
+                mse_loss_list.append(mse_loss.item())
+                loss_function_list.append(loss_function.item())
 
         self.memory.clear_memory()
         return np.mean(mse_loss_list),np.mean(loss_function_list)
