@@ -269,7 +269,7 @@ class Agent:
         if n_steps == None:
             while True:
                 self.train_step()
-                if self.memory.n_games > 3001:
+                if self.memory.n_games > 5000:
                     break
         else:
             for step in range(n_steps):
