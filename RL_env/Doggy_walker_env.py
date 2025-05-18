@@ -111,21 +111,21 @@ class Doggy_walker_env(gym.Env):
         reached_bonus = reached*10000
         cg_inside_bonus = cg_in * 5
         height_range_bonus = 10 if height_range else abs(height_goal-z) * -10
-        correct_direction_bonus = 10 if abs(loss_angle) < math.pi/9 else abs(loss_angle) * -10   
+        correct_direction_bonus = 10 if abs(loss_angle) < math.pi/9 else abs(loss_angle) * -20   
         area_bonus = 1 if poligon_area > 0.2 else 0
 
 
 
         vy_bonus = abs(vy)*-5
-        vz_bonus = abs(vz)*-0.5
-        pitch_bonus = abs(pitch) * -2
-        roll_bonus = abs(roll)*-2
+        vz_bonus = abs(vz)*-2
+        pitch_bonus = abs(pitch) * -5
+        roll_bonus = abs(roll)*-5
         y_offset_bonus = abs(y) * -10
         vel_0_bonus = (abs(vx)<0.1) * -5
-        maxed_joints_bonus = n_maxed_joints * -1
-        n_changes_joints_orientation_bonus = n_changes_joints_orientation * -0.1
-        zero_speed_joints_bonus = zero_speed_joints * -0.1
-        joints_accel_bonus = np.sum(joints_accel) * -0.01
+        maxed_joints_bonus = n_maxed_joints * -5
+        n_changes_joints_orientation_bonus = n_changes_joints_orientation * -0.5
+        zero_speed_joints_bonus = zero_speed_joints * -0.5
+        joints_accel_bonus = np.sum(joints_accel) * -0.1
 
         laydown_bonus = (laydown) * -1000.0
         upside_down_bonus = upside_down * -1000
