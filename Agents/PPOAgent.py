@@ -231,7 +231,7 @@ class Agent:
             mse_loss.backward()
             self.critic.optimizer.step()
         
-        return mse_loss, loss_function
+        return mse_loss, policy_loss
 
         
 
@@ -269,7 +269,7 @@ class Agent:
         if n_steps == None:
             while True:
                 self.train_step()
-                if self.memory.n_games > 5000:
+                if self.memory.n_games > 3001:
                     break
         else:
             for step in range(n_steps):
