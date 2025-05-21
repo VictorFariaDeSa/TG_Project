@@ -332,3 +332,14 @@ class Doggy_robot():
         delta = loss_angle - yaw
         delta = (delta + math.pi) % (2 * math.pi) - math.pi
         return delta
+    
+
+    def get_feet_above_base_link(self):
+        positions = ["RL","RR","FL","FR"]
+        height_ref = [self.get_joint_final_matrix(position)[2][3] for position in positions]
+        count = sum(h > 0 for h in height_ref)
+        return count
+
+        
+
+        

@@ -18,8 +18,8 @@ LAMBDA = 0.95
 NN_ACTOR_DIMENSIONS = [512,512,256]
 NN_CRITIC_DIMENSIONS = [512,256,128]
 POLICY_CLIP = 0.2
-LEARNING_RATE_ACTOR = 1e-5
-LEARNING_RATE_CRITIC = 1e-5
+LEARNING_RATE_ACTOR = 1e-6
+LEARNING_RATE_CRITIC = 1e-6
 EPOCHS = 10
 BATCH_SIZE = 50
 MSE_CTE = 0.5
@@ -269,8 +269,8 @@ class Agent:
         if n_steps == None:
             while True:
                 self.train_step()
-                if self.memory.n_games > 3001:
-                    break
+                # if self.memory.n_games > 3001:
+                #     break
         else:
             for step in range(n_steps):
                 self.train_step()

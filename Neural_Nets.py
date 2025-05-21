@@ -55,11 +55,11 @@ class ActorNetwork(nn.Module):
         self.optimizer = optim.Adam(self.parameters(),lr=lr)
         self.base = nn.Sequential(
             self.linear1,
-            nn.Tanh(),
+            nn.ReLU(),
             self.linear2,
-            nn.Tanh(),
+            nn.ReLU(),
             self.linear3,
-            nn.Tanh(), 
+            nn.ReLU(), 
         )
         self.mu_head = self.linear4
         self.log_std = nn.Parameter(torch.zeros(output_size))  # desvio padrão aprendido (fixo para todos os estados)

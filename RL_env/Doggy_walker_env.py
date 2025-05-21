@@ -105,6 +105,7 @@ class Doggy_walker_env(gym.Env):
         n_maxed_joints = sum(maxed_joints)
         loss_angle = self.robot.get_correct_direction_angle()
         joints_accel = np.abs(self.robot.get_joints_acceleration())
+        feets_above = self.robot.get_feet_above_base_link()
 
         dx_bonus = +(dx) * 750.0
         speed_bonus = vx*5
@@ -124,8 +125,9 @@ class Doggy_walker_env(gym.Env):
         vel_0_bonus = (abs(vx)<0.1) * -0.5
         maxed_joints_bonus = n_maxed_joints * -0.5
         n_changes_joints_orientation_bonus = n_changes_joints_orientation * -0.1
-        zero_speed_joints_bonus = zero_speed_joints * -0.1
+        zero_speed_joints_bonus = zero_speed_joints * -0.5
         joints_accel_bonus = np.sum(joints_accel) * -0.01
+        feets_above_bonus = feets_above * (-1)
 
         laydown_bonus = (laydown) * -1000.0
         upside_down_bonus = upside_down * -1000
@@ -154,6 +156,7 @@ class Doggy_walker_env(gym.Env):
             +n_changes_joints_orientation_bonus
             +zero_speed_joints_bonus
             +joints_accel_bonus
+            +feets_above_bonus
 
         )
 
