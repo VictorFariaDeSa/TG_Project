@@ -245,7 +245,7 @@ class Doggy_robot():
                 "FR":(fr_matrix[0][3],fr_matrix[1][3])}
 
 
-    def get_joint_final_matrix(self,vertex):
+    def get_joint_final_matrix(self,vertex,inertial_reference=False):
         dx = self.vertex_2_center[vertex]["x"]
         dy = self.vertex_2_center[vertex]["y"]
         dz = self.vertex_2_center[vertex]["z"]
@@ -255,12 +255,12 @@ class Doggy_robot():
         matrix = self.discover_foot_position(
             dx,dy,dz,\
             self.upper_leg_lenght,self.lower_leg_lenght,\
-            theta_1,theta_2
+            theta_1,theta_2,inertial_reference
             )
         return matrix
 
 
-    def discover_foot_position(self,dx,dy,dz,upper_length,lower_length,theta_1,theta_2):
+    def discover_foot_position(self,dx,dy,dz,upper_length,lower_length,theta_1,theta_2,inertial_reference=False):
         roll, pitch, yaw = self.sim.getObjectOrientation(self.robot, -1)
         inv_roll = self.get_homgeneous_transform_matrix(roll,0,0,0,"x")
         inv_pitch = self.get_homgeneous_transform_matrix(pitch,0,0,0,"y")
@@ -271,6 +271,9 @@ class Doggy_robot():
         r_1_2 = self.get_homgeneous_transform_matrix(-math.pi/2,0,0,0,"x")
         r_2_3 = self.get_homgeneous_transform_matrix(theta_2,0,upper_length,0,"z")
         r_3_4 = self.get_homgeneous_transform_matrix(0,0,lower_length,0,"x")
+
+        if inertial_reference:
+            return (((r_0_1 @ r_1_2) @ r_2_3) @ r_3_4)
 
         return inverse_rotation_matrix @ (((r_0_1 @ r_1_2) @ r_2_3) @ r_3_4)
     
@@ -336,7 +339,7 @@ class Doggy_robot():
 
     def get_feet_above_base_link(self):
         positions = ["RL","RR","FL","FR"]
-        height_ref = [self.get_joint_final_matrix(position)[2][3] for position in positions]
+        height_ref = [self.get_joint_final_matrix(position,True)[2][3] for position in positions]
         count = sum(h > 0 for h in height_ref)
         return count
 

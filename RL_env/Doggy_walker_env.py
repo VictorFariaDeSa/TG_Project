@@ -119,15 +119,15 @@ class Doggy_walker_env(gym.Env):
 
         vy_bonus = abs(vy)*-0.5
         vz_bonus = abs(vz)*-0.5
-        pitch_bonus = abs(pitch) * -0.5
+        pitch_bonus = abs(pitch) * -5 #era 0.5
         roll_bonus = abs(roll)*-0.5
         y_offset_bonus = abs(y) * -5
         vel_0_bonus = (abs(vx)<0.1) * -0.5
-        maxed_joints_bonus = n_maxed_joints * -0.5
+        maxed_joints_bonus = n_maxed_joints * -1 #era 0.5
         n_changes_joints_orientation_bonus = n_changes_joints_orientation * -0.1
-        zero_speed_joints_bonus = zero_speed_joints * -0.5
+        zero_speed_joints_bonus = zero_speed_joints * -0.1
         joints_accel_bonus = np.sum(joints_accel) * -0.01
-        feets_above_bonus = feets_above * (-1)
+        feets_above_bonus = feets_above * (-0.2)
 
         laydown_bonus = (laydown) * -1000.0
         upside_down_bonus = upside_down * -1000
