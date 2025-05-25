@@ -259,6 +259,19 @@ class Doggy_robot():
             )
         return matrix
 
+    def get_elbow_final_matrix(self,vertex,inertial_reference=False):
+            dx = self.vertex_2_center[vertex]["x"]
+            dy = self.vertex_2_center[vertex]["y"]
+            dz = self.vertex_2_center[vertex]["z"]
+            theta_1 = self.sim.getJointPosition(self.sim.getObject(f'/{self.name}/{vertex}_upper_leg_joint'))
+            theta_2 = self.sim.getJointPosition(self.sim.getObject(f'/{self.name}/{vertex}_lower_leg_joint'))
+
+            matrix = self.discover_elbow_position(
+                dx,dy,dz,\
+                self.upper_leg_lenght,\
+                theta_1,theta_2,inertial_reference
+                )
+            return matrix
 
     def discover_foot_position(self,dx,dy,dz,upper_length,lower_length,theta_1,theta_2,inertial_reference=False):
         roll, pitch, yaw = self.sim.getObjectOrientation(self.robot, -1)
@@ -276,6 +289,22 @@ class Doggy_robot():
             return (((r_0_1 @ r_1_2) @ r_2_3) @ r_3_4)
 
         return inverse_rotation_matrix @ (((r_0_1 @ r_1_2) @ r_2_3) @ r_3_4)
+    
+    def discover_elbow_position(self,dx,dy,dz,upper_length,theta_1,theta_2,inertial_reference=False):
+        roll, pitch, yaw = self.sim.getObjectOrientation(self.robot, -1)
+        inv_roll = self.get_homgeneous_transform_matrix(roll,0,0,0,"x")
+        inv_pitch = self.get_homgeneous_transform_matrix(pitch,0,0,0,"y")
+        inv_yaw = self.get_homgeneous_transform_matrix(yaw,0,0,0,"z")
+        inverse_rotation_matrix = inv_roll @ inv_pitch @ inv_yaw
+        
+        r_0_1 = self.get_homgeneous_transform_matrix(theta_1,dx,dy,dz,"y")
+        r_1_2 = self.get_homgeneous_transform_matrix(-math.pi/2,0,0,0,"x")
+        r_2_3 = self.get_homgeneous_transform_matrix(theta_2,0,upper_length,0,"z")
+
+        if inertial_reference:
+            return (((r_0_1 @ r_1_2) @ r_2_3))
+
+        return inverse_rotation_matrix @ (((r_0_1 @ r_1_2) @ r_2_3))
     
 
     def get_homgeneous_transform_matrix(self,theta,dx,dy,dz,axis):
@@ -326,8 +355,6 @@ class Doggy_robot():
         return inverse_rotation_matrix @ homo_matrix
 
 
-
-
     def get_correct_direction_angle(self):
         x,y,z = self.get_relative_position()
         roll, pitch,yaw = self.get_orientation()
@@ -342,6 +369,16 @@ class Doggy_robot():
         height_ref = [self.get_joint_final_matrix(position,True)[2][3] for position in positions]
         count = sum(h > 0 for h in height_ref)
         return count
+
+    def get_num_elbows_above_feet(self):
+        positions = ["RL","RR","FL","FR"]
+        counter = 0
+        for position in positions:
+            feet_h = self.get_joint_final_matrix(position,False)[2][3]
+            elbow_h = self.get_elbow_final_matrix(position,False)[2][3]
+            if feet_h < elbow_h:
+                counter += 1
+        return counter
 
         
 
