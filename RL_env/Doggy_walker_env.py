@@ -53,7 +53,7 @@ class Doggy_walker_env(gym.Env):
         reward = self.get_reward(clipped_action)
         done = self.check_done()
         truncated = self.n_steps >= MAX_STEPS
-
+        self.robot.update_all_info()
         self.score += reward
         info = {}
         if truncated:
@@ -86,27 +86,30 @@ class Doggy_walker_env(gym.Env):
 
 
     def get_reward(self, action):
-        [x,y,z] = self.robot.get_relative_position()
-        roll, pitch, yaw = self.robot.get_orientation()
-        stable = self.robot.check_stability(math.radians(45))
-        effort = sum(abs(action))
-        dx = self.robot.get_delta_x()
-        laydown = self.robot.check_fall()
-        reached = self.robot.check_arrival()
-        [vx, vy, vz], [wx, wy, wz] = self.robot.get_velocities()
-        n_changes_joints_orientation = self.robot.get_joints_orientation_change()
-        zero_speed_joints = sum(self.robot.get_joints_speed_0())
-        cg_in = self.robot.cg_inside()
-        upside_down = self.robot.check_upside_down()
-        poligon_area = self.robot.get_poligon_area()
+        [x,y,z] = self.robot.x,self.robot.y,self.robot.z
+        roll, pitch, yaw = self.robot.roll,self.robot.pitch,self.robot.yaw
+        dx = self.robot.delta_x
+        laydown = self.robot.fall
+        reached = self.robot.arrived
+        upside_down = self.robot.upside_down
+        [vx, vy, vz], [wx, wy, wz] = \
+            [self.robot.vx,self.robot.vy,self.robot.vz],[self.robot.wx,self.robot.wy,self.robot.wz]
+        n_changes_joints_orientation = self.robot.n_orientation_changes
+        zero_speed_joints = sum(self.robot.joints_0_speed)
         height_goal = 0.35
         height_range = abs(height_goal-z) < 0.1
-        maxed_joints = self.robot.get_joints_on_max()
-        n_maxed_joints = sum(maxed_joints)
-        loss_angle = self.robot.get_correct_direction_angle()
+        n_maxed_joints = sum(self.robot.joints_onMax)
+        poligon_area = self.robot.poligon_area
+        cg_in = self.robot.cg_inside
+        feets_above = self.robot.n_feet_above_base_link
+        elbows_above_feet = self.robot.n_elbows_above_feet
+        crossing_foot = self.robot.crossing_foot
+        foot_distance = self.robot.foot_distance
+        loss_angle = self.robot.correct_dir_angle
+        
         joints_accel = np.abs(self.robot.get_joints_acceleration())
-        feets_above = self.robot.get_feet_above_base_link()
-        elbows_above_feet = self.robot.get_num_elbows_above_feet()
+
+
 
         dx_bonus = +(dx) * 750.0
         speed_bonus = vx*5
@@ -116,7 +119,8 @@ class Doggy_walker_env(gym.Env):
         correct_direction_bonus = 10 if abs(loss_angle) < math.pi/9 else abs(loss_angle) * -1   
         area_bonus = 1 if poligon_area > 0.2 else 0
         elbows_bonus = elbows_above_feet * 0.5 if elbows_above_feet < 4 else 5
-
+        crossing_foot_bonus = -10 * sum(x==1 for x in crossing_foot)
+        foot_distance_bonus = -5 * sum(x<0.15 for x in foot_distance)
 
 
         vy_bonus = abs(vy)*-0.5
@@ -160,6 +164,8 @@ class Doggy_walker_env(gym.Env):
             +joints_accel_bonus
             +feets_above_bonus
             +elbows_bonus
+            +crossing_foot_bonus
+            +foot_distance_bonus
 
         )
 
@@ -167,19 +173,16 @@ class Doggy_walker_env(gym.Env):
 
     def get_observation(self):
         obs = []
-
-        x, y, z = self.robot.get_relative_position()
-        roll,pitch,yaw = self.robot.get_orientation()
-        (vx, vy, vz), (wx, wy, wz) = self.robot.get_velocities()
+        x, y, z = self.robot.x,self.robot.y,self.robot.z
+        roll,pitch,yaw = self.robot.roll,self.robot.pitch,self.robot.yaw
+        [vx, vy, vz], [wx, wy, wz] = \
+            [self.robot.vx,self.robot.vy,self.robot.vz],[self.robot.wx,self.robot.wy,self.robot.wz]
         joints_data = self.robot.get_all_joints_information()
 
         obs.extend([x, y, z])
         obs.extend([roll,pitch,yaw])
         obs.extend([vx, vy, vz, wx, wy, wz])
         obs.extend(joints_data)
-        matrix = self.robot.get_matrix()
-        # obs.append(matrix[0])
-
 
         return np.array(obs, dtype=np.float32)
 

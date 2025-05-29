@@ -11,7 +11,10 @@ from RL_env.Doggy_walker_env import Doggy_walker_env
 from PPOMemory import PPOMemory
 
 
-
+#NOTES: 
+# velocidade máxima das juntas /2
+# Adição de foot crossing
+# adição de foot distance
 
 GAMMA = 0.99
 LAMBDA = 0.95
@@ -104,12 +107,12 @@ class Agent:
         )
         self.last_observation = new_observation
         self.memory.remember_all(
-            positions=self.env.robot.get_relative_position(),
-            speeds=self.env.robot.get_velocities()[0],
-            rpy = self.env.robot.get_orientation(),
-            poligon_area=self.env.robot.get_poligon_area(),
-            cg_inside=self.env.robot.cg_inside(),
-            relative_yaw_angle=self.env.robot.get_correct_direction_angle(),
+            positions=[self.env.robot.x,self.env.robot.y,self.env.robot.z],
+            speeds=[self.env.robot.vx,self.env.robot.vy,self.env.robot.vz],
+            rpy = [self.env.robot.roll,self.env.robot.pitch,self.env.robot.yaw],
+            poligon_area=self.env.robot.poligon_area,
+            cg_inside=self.env.robot.cg_inside,
+            relative_yaw_angle=self.env.robot.correct_dir_angle,
             reward = reward)
 
         if terminated or truncated:
