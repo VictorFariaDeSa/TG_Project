@@ -107,12 +107,12 @@ class Agent:
         )
         self.last_observation = new_observation
         self.memory.remember_all(
-            positions=[self.env.robot.x,self.env.robot.y,self.env.robot.z],
-            speeds=[self.env.robot.vx,self.env.robot.vy,self.env.robot.vz],
-            rpy = [self.env.robot.roll,self.env.robot.pitch,self.env.robot.yaw],
-            poligon_area=self.env.robot.poligon_area,
-            cg_inside=self.env.robot.cg_inside,
-            relative_yaw_angle=self.env.robot.correct_dir_angle,
+            positions=self.env.robot.positions,
+            speeds=self.env.robot.linear_velocities,
+            rpy = self.env.robot.orientations,
+            poligon_area=self.env.robot.get_poligon_area(),
+            cg_inside=self.env.robot.cg_inside(),
+            relative_yaw_angle=self.env.robot.get_correct_direction_angle(),
             reward = reward)
 
         if terminated or truncated:
@@ -325,5 +325,6 @@ if __name__ == "__main__":
         normalize_data = NORMALIZE_DATA,
         classic_returns = CLASSIC_RETURNS
         )
+
 
     model.train()

@@ -48,24 +48,24 @@ class Doggy_walker_env(gym.Env):
         clipped_action = np.clip(action, self.action_space.low, self.action_space.high)
         self.robot.input_position_actions(clipped_action)
         self.sim.step()
+        self.robot.update_robot_data()
         self.n_steps += 1
         obs = self.get_observation()
         reward = self.get_reward(clipped_action)
         done = self.check_done()
         truncated = self.n_steps >= MAX_STEPS
-        self.robot.update_all_info()
         self.score += reward
         info = {}
         if truncated:
             info["end_cause"] = "truncated"
         if done:
-            if self.robot.check_fall():
+            if self.robot.fall:
                 info["end_cause"] = "fall"
-            elif self.robot.check_upside_down():
+            elif self.robot.upside_down:
                 info["end_cause"] = "upside_down"
-            elif self.robot.check_arrival():
+            elif self.robot.arrival:
                 info["end_cause"] = "arrival"
-        return obs, reward, done, truncated, info
+        return obs, reward, bool(done), truncated, info
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -75,7 +75,7 @@ class Doggy_walker_env(gym.Env):
 
         reset_sim(self.sim)
 
-        self.robot.last_x = self.robot.get_relative_position()[0]
+        self.robot.last_x = self.robot.positions[0]
         self.last_time = self.sim.getSimulationTime()
         self.robot.last_time = self.sim.getSimulationTime()
 
@@ -86,28 +86,27 @@ class Doggy_walker_env(gym.Env):
 
 
     def get_reward(self, action):
-        [x,y,z] = self.robot.x,self.robot.y,self.robot.z
-        roll, pitch, yaw = self.robot.roll,self.robot.pitch,self.robot.yaw
+        [x,y,z] = self.robot.positions
+        roll, pitch, yaw = self.robot.orientations
         dx = self.robot.delta_x
         laydown = self.robot.fall
-        reached = self.robot.arrived
+        reached = self.robot.arrival
         upside_down = self.robot.upside_down
-        [vx, vy, vz], [wx, wy, wz] = \
-            [self.robot.vx,self.robot.vy,self.robot.vz],[self.robot.wx,self.robot.wy,self.robot.wz]
-        n_changes_joints_orientation = self.robot.n_orientation_changes
-        zero_speed_joints = sum(self.robot.joints_0_speed)
+        [vx, vy, vz] = self.robot.linear_velocities
+        n_changes_joints_orientation = self.robot.get_joints_orientation_change()
+        zero_speed_joints = sum(self.robot.get_joints_speed_0())
+        cg_in = self.robot.cg_inside()
+        poligon_area = self.robot.get_poligon_area()
         height_goal = 0.35
         height_range = abs(height_goal-z) < 0.1
-        n_maxed_joints = sum(self.robot.joints_onMax)
-        poligon_area = self.robot.poligon_area
-        cg_in = self.robot.cg_inside
-        feets_above = self.robot.n_feet_above_base_link
-        elbows_above_feet = self.robot.n_elbows_above_feet
-        crossing_foot = self.robot.crossing_foot
-        foot_distance = self.robot.foot_distance
-        loss_angle = self.robot.correct_dir_angle
-        
+        maxed_joints = self.robot.get_joints_on_max()
+        n_maxed_joints = sum(maxed_joints)
+        loss_angle = self.robot.get_correct_direction_angle()
         joints_accel = np.abs(self.robot.get_joints_acceleration())
+        feets_above = self.robot.get_feet_above_base_link()
+        elbows_above_feet = self.robot.get_num_elbows_above_feet()
+        foot_distance = self.robot.get_same_side_foot_distance()
+        crossing_foot = self.robot.get_crossing_foot()
 
 
 
@@ -173,10 +172,11 @@ class Doggy_walker_env(gym.Env):
 
     def get_observation(self):
         obs = []
-        x, y, z = self.robot.x,self.robot.y,self.robot.z
-        roll,pitch,yaw = self.robot.roll,self.robot.pitch,self.robot.yaw
-        [vx, vy, vz], [wx, wy, wz] = \
-            [self.robot.vx,self.robot.vy,self.robot.vz],[self.robot.wx,self.robot.wy,self.robot.wz]
+
+        x, y, z = self.robot.positions
+        roll,pitch,yaw = self.robot.orientations
+        (vx, vy, vz) = self.robot.linear_velocities
+        (wx, wy, wz) = self.robot.angular_velocities
         joints_data = self.robot.get_all_joints_information()
 
         obs.extend([x, y, z])
@@ -184,10 +184,11 @@ class Doggy_walker_env(gym.Env):
         obs.extend([vx, vy, vz, wx, wy, wz])
         obs.extend(joints_data)
 
+
         return np.array(obs, dtype=np.float32)
 
     def check_done(self):
-        return self.robot.check_fall() or self.robot.check_arrival() or self.robot.check_upside_down() #or not self.robot.cg_inside(tolerance=1)
+        return self.robot.fall or self.robot.arrival or self.robot.upside_down
 
 
     
