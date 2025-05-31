@@ -7,7 +7,7 @@ import math
 from RL_env.Doggy_robot import Doggy_robot
 from helpers.coppelia_helper import create_stepped_sim,reset_sim,start_sim
 
-MAX_STEPS = 1000
+MAX_STEPS = 500
 HIGH_ACTION = 3
 LOW_ACTION = -3
 
@@ -107,6 +107,9 @@ class Doggy_walker_env(gym.Env):
         elbows_above_feet = self.robot.get_num_elbows_above_feet()
         foot_distance = self.robot.get_same_side_foot_distance()
         crossing_foot = self.robot.get_crossing_foot()
+        stationary_joints = self.robot.get_delta_foot_positions()
+        delta_positions = self.robot.get_delta_foot_positions()
+        sum_delta_positions = sum(abs(x) for x in delta_positions)
 
 
 
@@ -129,10 +132,12 @@ class Doggy_walker_env(gym.Env):
         y_offset_bonus = abs(y) * -5
         vel_0_bonus = (abs(vx)<0.1) * -0.5
         maxed_joints_bonus = n_maxed_joints * -0.5 #era 0.5
-        n_changes_joints_orientation_bonus = n_changes_joints_orientation * -0.1
+        n_changes_joints_orientation_bonus = n_changes_joints_orientation * -1
+        stationary_joints_bonus =  stationary_joints * -5 if stationary_joints < 0.2 else 0
         zero_speed_joints_bonus = zero_speed_joints * -0.1
         joints_accel_bonus = np.sum(joints_accel) * -0.01
         feets_above_bonus = feets_above * (-0.2)
+        delta_pos_bonus = -2 * sum_delta_positions
 
         laydown_bonus = (laydown) * -1000.0
         upside_down_bonus = upside_down * -1000
@@ -165,6 +170,8 @@ class Doggy_walker_env(gym.Env):
             +elbows_bonus
             +crossing_foot_bonus
             +foot_distance_bonus
+            +stationary_joints_bonus
+            +delta_pos_bonus
 
         )
 

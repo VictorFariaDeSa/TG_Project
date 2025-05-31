@@ -1,6 +1,6 @@
 import numpy as np
 import math
-
+import copy
 class Doggy_robot():
     def __init__(self,sim,robot_name,target_name):
         self.sim = sim
@@ -38,6 +38,7 @@ class Doggy_robot():
         self.foots_HT_matrix = {}
         self.foots_inertial_HT_matrix = {}
 
+        self.last_foot_HT_matrix ={}
         
 
         self.update_robot_data()
@@ -108,6 +109,7 @@ class Doggy_robot():
         self.inverse_matrix = self.get_inverse_rotation_matrix()
         self.cg_matrix = self.get_cg()
         self.inertial_cg_matrix = self.inverse_matrix @ self.cg_matrix
+        self.time = self.sim.getSimulationTime()
         for vertex in self.vertex:
             self.elbows_HT_matrix[vertex] = self.get_elbow_final_matrix(vertex)
             self.elbows_inertial_HT_matrix[vertex] = self.inverse_matrix @ self.elbows_HT_matrix[vertex]
@@ -330,6 +332,38 @@ class Doggy_robot():
         delta = (delta + math.pi) % (2 * math.pi) - math.pi
         return delta
 
+
+    def get_delta_foot_positions(self):
+        total_displacement = 0
+        if (len(self.last_foot_HT_matrix.keys())>0):
+            delta_dict = {}
+            for key in self.last_foot_HT_matrix.keys():
+                delta_dict[key] = self.foots_HT_matrix[key] - self.last_foot_HT_matrix[key]
+                dx = self.foots_HT_matrix[key][0][3] - self.last_foot_HT_matrix[key][0][3]
+                dy = self.foots_HT_matrix[key][1][3] - self.last_foot_HT_matrix[key][1][3]
+                dz = self.foots_HT_matrix[key][2][3] - self.last_foot_HT_matrix[key][2][3]
+                total_displacement += abs(dx) + abs(dy) + abs(dz)
+        self.last_foot_HT_matrix = copy.deepcopy(self.foots_HT_matrix)
+        return total_displacement
+
+    def get_joints_desired_x_pos(self):
+        frequency = 1 
+        amplitude = 0.15
+        delta_positions = []
+        for vertex in self.vertex:
+            offset = math.pi/2 if vertex in ["RL","FR"] else 0
+            pos = self.vertex_2_center[vertex]["x"] + (amplitude * math.sin(math.pi*frequency+offset))
+            delta = self.foots_inertial_HT_matrix[pos]["x"] - pos
+            delta_positions.append(delta)
+
+        return delta_positions
+
+
+
+
+
+
+
     def get_joints_orientation(self):
         speeds = np.array(self.get_joints_speeds())
         orientation = np.where(speeds > 0, 1, np.where(speeds < 0, -1, 0))
@@ -348,11 +382,10 @@ class Doggy_robot():
     def get_joints_acceleration(self):
         joints_speed = self.get_joints_speeds()
         delta_speeds = np.array(joints_speed)-np.array(self.last_joints_speed)
-        curr_time = self.sim.getSimulationTime()
-        delta_time = curr_time - self.last_time
+        delta_time = self.curr_time - self.last_time
         accel = delta_speeds/delta_time
 
-        self.last_time = curr_time
+        self.last_time = self.curr_time
         self.last_joints_speed = joints_speed
 
         return accel
