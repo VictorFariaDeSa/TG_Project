@@ -6,6 +6,7 @@ class Doggy_robot():
         self.sim = sim
         self.name = robot_name
         self.target_name = target_name
+        self.sensor = sim.getObject(f'./{robot_name}/base_link_visual/LaserPointer/sensor')
         self.vertex = ["RL","RR","FL","FR"]
         self.joint_list = [
             "RR_upper_leg_joint", "FL_upper_leg_joint",
@@ -21,6 +22,19 @@ class Doggy_robot():
             ]
         self.robot = self.sim.getObject(f'/{self.name}/')
         self.target = self.sim.getObject(f'/{self.target_name}')
+
+
+        self.foot_handles = {}
+        self.floor_handles = [self.sim.getObjectHandle(f"./Floor[{i}]") for i in range(12)]
+        for vertex in self.vertex:
+            foot_path = f"./{self.name}/{vertex}_upper_leg_joint/{vertex}_lower_leg_joint/{vertex}_foot_joint/{vertex}_foot_link_respondable"
+            self.foot_handles[vertex] = self.sim.getObjectHandle(foot_path)
+        self.joints_target = np.zeros(8)
+        self.last_joints_target = np.zeros(8)
+        self.last_last_joints_target = np.zeros(8)
+
+
+
         self.fill_robot_data()
         
         self.joints_data = {}
@@ -43,6 +57,10 @@ class Doggy_robot():
 
         self.update_robot_data()
 
+    def read_laser_height(self):
+        og_vector = np.array([[0],[0],[self.sim.readProximitySensor(self.sensor)[1]+0.1430],[1]])
+        new_height_vector = self.inverse_matrix @ og_vector
+        return new_height_vector
 
     def fill_robot_data(self):
         handleDict = {}
@@ -93,13 +111,22 @@ class Doggy_robot():
     def input_speed_actions(self,actions):
         for i, jointName in enumerate(self.joint_list):
             joint = self.handleDict[jointName]
-            action_idx = i // 2
-            self.sim.setJointTargetVelocity(joint, float(actions[action_idx]))
+            self.sim.setJointTargetVelocity(joint, float(actions[i]))
 
     def input_position_actions(self,actions):
         for i, jointName in enumerate(self.joint_list):
             joint = self.handleDict[jointName]
             self.sim.setJointTargetPosition(joint, float(actions[i]))
+        self.last_last_joints_target = self.last_joints_target.copy() if self.last_joints_target is not None else None
+        self.last_joints_target = self.joints_target.copy() if self.joints_target is not None else None
+        self.joints_target = np.array(actions)
+
+    def input_torque_actions(self, actions):
+        print(actions)
+        for i, jointName in enumerate(self.joint_list):
+            joint = self.handleDict[jointName]
+            self.sim.setJointMode(joint, self.sim.jointmode_force, 0)
+            self.sim.setJointForce(joint, float(actions[i]*10))
 
     def update_robot_data(self):
         self.positions = self.get_relative_position()
@@ -116,13 +143,30 @@ class Doggy_robot():
             self.foots_HT_matrix[vertex] = self.discover_foot_position(self.elbows_HT_matrix[vertex],self.lower_leg_lenght)
             self.foots_inertial_HT_matrix[vertex] = self.inverse_matrix @ self.foots_HT_matrix[vertex]
         self.fill_joints_dict()
-
-
+        self.height = self.read_laser_height()[2]
+        self.foot_colision = self.check_foot_collision()
+        # print(f"z: {self.positions[2]} ---- height: {self.height} ---- diff: {self.height - self.positions[2]}")
 
         self.fall = self.check_fall()
         self.upside_down = self.check_upside_down()
         self.arrival = self.check_arrival()
         self.last_x = self.positions[0]
+
+
+
+
+    def check_foot_collision(self):
+        foot_collision = {}
+        for vertex, foot_handle in self.foot_handles.items():
+            contact = 0
+            for floor_handle in self.floor_handles:
+                if self.sim.checkCollision(foot_handle, floor_handle)[0]:
+                    contact = 1
+                    break  # já encontrou contato, não precisa testar o resto
+            foot_collision[vertex] = contact
+        return foot_collision
+
+
 
     def get_relative_position(self):
         return self.sim.getObjectPosition(self.robot, self.target)
@@ -149,8 +193,8 @@ class Doggy_robot():
         return z < 0.15
 
     def check_arrival(self):
-        dx, _, _ = self.positions
-        return abs(dx) < 1.0
+        dx, dy, _ = self.positions
+        return abs(dx) < 1.0 and abs(dy) < 1.0
     
     def check_vel_0(self):
         return self.linear_velocities[0] < 0.1
@@ -242,14 +286,22 @@ class Doggy_robot():
             else:
                 return 0
 
+    def get_joint_force(self,jointName):
+        joint = self.handleDict[jointName]
+        force = self.sim.getJointForce(joint)
+        return force
+
     def fill_joints_dict(self):
         for jointName in self.joint_list:
             angle,speed = self.get_joint_information(jointName)
             maxed = self.check_joint_maxed(jointName,angle)
+            force = self.get_joint_force(jointName)
             self.joints_data[jointName]={}
             self.joints_data[jointName]["angle"] = angle
             self.joints_data[jointName]["speed"] = speed
             self.joints_data[jointName]["maxed"] = maxed
+            self.joints_data[jointName]["force"] = force
+
 
     def get_joints_speeds(self):
         speeds = []
@@ -268,6 +320,13 @@ class Doggy_robot():
         for jointName in self.joint_list:
             maxed.append(self.joints_data[jointName]["maxed"])
         return maxed
+
+    def get_joints_torque(self):
+        force = []
+        for jointName in self.joint_list:
+            force.append(self.joints_data[jointName]["force"])
+        return force
+
 
     def get_all_joints_information(self):
         joints_data = []
@@ -346,16 +405,15 @@ class Doggy_robot():
         self.last_foot_HT_matrix = copy.deepcopy(self.foots_HT_matrix)
         return total_displacement
 
-    def get_joints_desired_x_pos(self):
+    def get_joints_delta_x_pos(self):
         frequency = 1 
         amplitude = 0.15
         delta_positions = []
         for vertex in self.vertex:
             offset = math.pi/2 if vertex in ["RL","FR"] else 0
             pos = self.vertex_2_center[vertex]["x"] + (amplitude * math.sin(math.pi*frequency+offset))
-            delta = self.foots_inertial_HT_matrix[pos]["x"] - pos
+            delta = self.foots_inertial_HT_matrix[vertex][0][3] - pos
             delta_positions.append(delta)
-
         return delta_positions
 
 
@@ -382,10 +440,10 @@ class Doggy_robot():
     def get_joints_acceleration(self):
         joints_speed = self.get_joints_speeds()
         delta_speeds = np.array(joints_speed)-np.array(self.last_joints_speed)
-        delta_time = self.curr_time - self.last_time
+        delta_time = self.time - self.last_time
         accel = delta_speeds/delta_time
 
-        self.last_time = self.curr_time
+        self.last_time = self.time
         self.last_joints_speed = joints_speed
 
         return accel
@@ -408,13 +466,55 @@ class Doggy_robot():
 
 
 
+    def get_desired_xy_pos(self,vertex,t,freq,k1,k2):
+        
+        if vertex in ["RL", "FR"]:
+            offset = math.pi
+        elif vertex in ["FL", "RR"]:
+            offset = 0
+        else:
+            raise ValueError(f"Erro: jointName inválido: {vertex}")
 
+
+        x = k1 * np.cos(freq/math.pi*t + offset)
+        y = k2 * np.sin(freq/math.pi*t + offset)
+        if y > 0:
+            y=0
+        return (x+0.1,y+0.35)
     
+    def inverse_kin(self,coords,upper_len,lower_len):
+        x = coords[0]
+        y = coords[1]
 
+        if (x**2 + y**2)>(upper_len+lower_len)**2:
+            print("Fora do espaço")
+
+        D = (x**2+y**2-lower_len**2-upper_len**2)/(2*upper_len*lower_len)
+        theta2 = math.atan2(math.sqrt(1-D**2),D)#revisar o sinal do -
+        gamma = math.atan2(lower_len*math.sin(theta2),upper_len + lower_len*math.cos(theta2))
+        theta1 = math.atan2(y,x) - gamma
+
+        return (theta1,theta2)
     
-
+    def get_thetas_dict(self):
+        thetas_dict = {}
+        for vertex in self.vertex:
+            thetas_dict[vertex] = {}
+            pos = self.get_desired_xy_pos(vertex,self.time,40,0.25,0.15)
+            thetas = self.inverse_kin(pos,self.upper_leg_lenght,self.lower_leg_lenght)
+            thetas_dict[vertex]["theta1"] = thetas[0]
+            thetas_dict[vertex]["theta2"] = thetas[1]
+        return thetas_dict
     
-
+    def convert_thetas_dict_to_actions_list(self,theta_dict):
+        actions = []
+        for jointName in self.joint_list:
+            thetas = theta_dict[jointName[0:2]]
+            if "upper" in jointName:
+                actions.append(thetas["theta1"])
+            else:
+                actions.append(-thetas["theta2"])
+        return actions
 
 
 

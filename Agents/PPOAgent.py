@@ -156,10 +156,10 @@ class Agent:
         loss_function_list = []
         mse_loss_list = []
         if self.classic_returns:
-            self.memory.buffer_advantages,_ = self.calculate_GAE(next_value = None)
+            self.memory.buffer_advantages,_ = self.calculate_GAE(next_value)
             self.memory.buffer_returns = self.calculate_returns_old_fashion(self.memory.buffer_rewards)
         else:
-            self.memory.buffer_advantages,self.memory.buffer_returns = self.calculate_GAE(next_value = None)
+            self.memory.buffer_advantages,self.memory.buffer_returns = self.calculate_GAE(next_value)
         for epoch in range(self.epochs):
             states,actions,rewards,terminals,\
             next_states,probs,state_values,\
@@ -249,7 +249,10 @@ class Agent:
         returns = np.zeros_like(rewards)
         gae = 0
         for t in reversed(range(len(rewards))):
-            delta = rewards[t] + self.gamma * values[t + 1] - values[t] if t < len(rewards) - 1 else rewards[t] - values[t] #Calculo da vantagem específica do tempo T
+            if t < len(rewards) - 1:
+                delta = rewards[t] + self.gamma * values[t + 1] - values[t]
+            else:
+                delta = rewards[t] + self.gamma * next_value - values[t] 
             gae = delta + self.gamma * self.lam * gae
             advantages[t] = gae
             returns[t] = gae + values[t]
@@ -288,17 +291,26 @@ class Agent:
         self.memory.register_score()
 
     def load_model(self):
-        if os.path.exists("models/critic_model.pth") and os.path.exists("models/actor_model.pth"):
+        if os.path.exists("models/critic_model.pth"):
             print("...Loading Model...")
             if self.single_nn:
                 self.nn.critic.load_state_dict(torch.load("models/critic_model.pth"))
-                self.nn.actor.load_state_dict(torch.load("models/actor_model.pth"))
             else:   
-                self.actor.load_state_dict(torch.load("models/actor_model.pth"))
                 self.critic.load_state_dict(torch.load("models/critic_model.pth"))
             
         else:
-            print("File no found, no model will be loaded")
+            print("Critic file no found, no model will be loaded")
+
+        if os.path.exists("models/actor_model.pth"):
+            print("...Loading Model...")
+            if self.single_nn:
+                self.nn.actor.load_state_dict(torch.load("models/actor_model.pth"))
+            else:   
+                self.actor.load_state_dict(torch.load("models/actor_model.pth"))
+            
+        else:
+            print("Actor file no found, no model will be loaded")
+        
 
 
 if __name__ == "__main__":

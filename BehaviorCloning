@@ -1,0 +1,52 @@
+import numpy as np
+import pickle
+import os
+from Neural_Nets import ActorNetwork
+import torch
+from torch.utils.data import TensorDataset, DataLoader
+from torch import nn
+
+inner_dimensions_actor = [512,512,256]
+n_joints = 8
+lr_actor = 3e-5
+
+actor_NN = ActorNetwork(input_size = 32,
+                                  hidden_size1=inner_dimensions_actor[0],
+                                  hidden_size2=inner_dimensions_actor[1],
+                                  hidden_size3=inner_dimensions_actor[2],
+                                  output_size = n_joints,
+                                  lr = lr_actor,)
+
+loss_fn = nn.MSELoss()
+
+with open("dataset/imitation_data.pkl", "rb") as f:
+    data = pickle.load(f)
+
+observations = data["observations"]
+actions = data["actions"]
+
+obs_tensor = torch.tensor(observations, dtype=torch.float32)
+act_tensor = torch.tensor(actions, dtype=torch.float32)
+
+dataset = TensorDataset(obs_tensor, act_tensor)
+dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
+
+epochs = 100
+for epoch in range(epochs):
+    total_loss = 0
+    for batch_obs, batch_act in dataloader:
+        dist = actor_NN(batch_obs)
+        pred = dist.mean
+        loss = loss_fn(pred, batch_act)
+
+        actor_NN.optimizer.zero_grad()
+        loss.backward()
+        actor_NN.optimizer.step()
+
+        total_loss += loss.item()
+
+    print(f"Época {epoch+1}/{epochs}, Loss: {total_loss:.4f}")
+
+# Salvar modelo
+actor_NN.save(file_name="Imitation_trained.pth")
+print("✅ Modelo salvo em 'policy_network.pt'")

@@ -62,12 +62,13 @@ class ActorNetwork(nn.Module):
             nn.ReLU(), 
         )
         self.mu_head = self.linear4
-        self.log_std = nn.Parameter(torch.zeros(output_size))  # desvio padrão aprendido (fixo para todos os estados)
+        self.log_std = nn.Parameter(torch.full((output_size,), -0.0))   # desvio padrão aprendido (fixo para todos os estados)
 
     def forward(self, state):
         x = self.base(state)
         mu = self.mu_head(x)
-        std = torch.exp(self.log_std)
+        log_std = torch.clamp(self.log_std, min=-2.0, max=0.5)
+        std = torch.exp(log_std)
         dist = Normal(mu, std)
         return dist
     
